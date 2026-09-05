@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import { TaskView, type TasksData } from './TaskView'
 
-export const inject = ['slots']
+export const inject = ['slots', 'sessions', 'workspaces']
 
 const VIEW_ID_TASK = 'dsh-task-canvas'
 const VIEW_ID_DESIGN = 'ipollowork-design-studio'
@@ -22,8 +22,8 @@ export function apply(ctx: Context) {
     )
   )
 
-  // 2. 挂载全局按需常驻加号 (+) 菜单管理器 (统一收纳 Task, Design, Video)
-  setupDynamicViewManager()
+  // 2. 挂载全局按需常驻加号 (+) 菜单管理器 (以工作区为粒度独立隔离)
+  setupDynamicViewManager(ctx)
 }
 
 /**
@@ -145,19 +145,51 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions }: { sessionI
 }
 
 /**
- * 顶部 Tab 栏统一动态管理器：
- * 1. 默认收纳 [Task]、[Design]、[Video]，避免无用时占据顶部空间
- * 2. 在 [role="tablist"] 右侧注入 [+] 加号按钮与浮层菜单
- * 3. 用户在 [+] 菜单中按需勾选常驻哪项，哪项就显示在顶部，并支持一键取消常驻
+ * 获取当前活动会话所属的工作区标识（优先 workspaceId，无工作区会话为 default）
  */
-function setupDynamicViewManager() {
+function getCurrentWorkspaceScope(ctx?: Context): string {
+  try {
+    if (ctx?.sessions && ctx?.workspaces) {
+      const currentSessionId = ctx.sessions.list?.getSnapshot?.()?.current
+      if (currentSessionId) {
+        const wsSnapshot = ctx.workspaces.list?.getSnapshot?.()
+        const found = wsSnapshot?.items?.find((item: any) => item.sessionIds?.includes(currentSessionId))
+        if (found?.workspaceId) return String(found.workspaceId)
+      }
+    }
+  } catch (e) {
+    // 降级使用页面 DOM 面包屑或 default
+  }
+  return 'default'
+}
+
+/**
+ * 顶部 Tab 栏统一动态管理器：
+ * 1. 修复同行排版：严格对齐 DSH 原生 .tab 样式与尺寸，禁止换行
+ * 2. 工作区独立隔离：每个工作区的视图常驻状态（Task / Design / Video）彼此完全隔离
+ */
+function setupDynamicViewManager(ctx: Context) {
   if (typeof document === 'undefined') return
 
-  // 注入样式控制显隐与 [+] 按钮样式
   const styleEl = document.createElement('style')
   styleEl.id = 'dsh-workspace-canvas-manager-styles'
   styleEl.textContent = `
-    /* 默认隐藏未勾选常驻的扩展视图，仅在对应开关为 true 时展示 */
+    /* 保证 [role="tablist"] 内的所有标签强制同一行排版、禁止折行换行 */
+    div[role="tablist"] {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      align-items: center !important;
+      gap: 32px !important;
+      position: relative !important;
+      overflow-x: auto !important;
+      scrollbar-width: none !important;
+    }
+    div[role="tablist"]::-webkit-scrollbar {
+      display: none !important;
+    }
+
+    /* 默认隐藏未在当前工作区勾选常驻的扩展视图，仅在对应作用域开关为 true 时展示 */
     body:not([data-dsh-show-task="true"]) button[role="tab"][data-view-kind="task"] {
       display: none !important;
     }
@@ -168,22 +200,29 @@ function setupDynamicViewManager() {
       display: none !important;
     }
 
-    /* [+] 加号管理按钮样式 */
+    /* 确保注入的 tab 按钮与原生 tab 样式 100% 同行对齐 */
+    button[role="tab"] {
+      flex-shrink: 0 !important;
+      white-space: nowrap !important;
+    }
+
+    /* [+] 加号管理按钮样式：高度对齐，紧跟在 tablist 末尾 */
     .dsh-view-add-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 22px;
-      height: 22px;
-      margin-left: 6px;
+      width: 20px;
+      height: 20px;
+      margin-bottom: 9px;
       border: 1px dashed var(--dsw-alias-border-l3, rgba(255, 255, 255, 0.2));
       border-radius: 4px;
       background: transparent;
       color: var(--dsw-alias-label-secondary, #a0a0a8);
-      font-size: 14px;
+      font-size: 13px;
       line-height: 1;
       cursor: pointer;
-      transition: all 150ms ease;
+      flex-shrink: 0;
+      transition: all 120ms ease;
     }
     .dsh-view-add-btn:hover {
       background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, 0.08));
@@ -196,7 +235,7 @@ function setupDynamicViewManager() {
       position: absolute;
       top: 100%;
       right: 0;
-      margin-top: 6px;
+      margin-top: 4px;
       width: 130px;
       background: var(--dsw-alias-bg-layer-2, #212124);
       border: 1px solid var(--dsw-alias-border-l3, rgba(255, 255, 255, 0.16));
@@ -231,10 +270,13 @@ function setupDynamicViewManager() {
   `
   document.head.appendChild(styleEl)
 
-  // 同步 Tab 栏标识与显隐属性
+  // 同步 Tab 栏标识与当前工作区专属的显隐属性
   const syncTabBar = () => {
     const tablist = document.querySelector('[role="tablist"]')
     if (!tablist) return
+
+    // 获取当前活动工作区的独立 scope key
+    const wsScope = getCurrentWorkspaceScope(ctx)
 
     // 标记各 tab 的类型
     const tabs = tablist.querySelectorAll('button[role="tab"]')
@@ -249,10 +291,10 @@ function setupDynamicViewManager() {
       }
     })
 
-    // 读取开关状态
-    const showTask = localStorage.getItem('dsh.canvas.show_task') === 'true'
-    const showDesign = localStorage.getItem('dsh.canvas.show_design') === 'true'
-    const showVideo = localStorage.getItem('dsh.canvas.show_video') === 'true'
+    // 基于当前工作区读取独立配置
+    const showTask = localStorage.getItem(`dsh.canvas.${wsScope}.show_task`) === 'true'
+    const showDesign = localStorage.getItem(`dsh.canvas.${wsScope}.show_design`) === 'true'
+    const showVideo = localStorage.getItem(`dsh.canvas.${wsScope}.show_video`) === 'true'
 
     document.body.setAttribute('data-dsh-show-task', showTask ? 'true' : 'false')
     document.body.setAttribute('data-dsh-show-design', showDesign ? 'true' : 'false')
@@ -282,9 +324,10 @@ function setupDynamicViewManager() {
           return
         }
 
-        const curTask = localStorage.getItem('dsh.canvas.show_task') === 'true'
-        const curDesign = localStorage.getItem('dsh.canvas.show_design') === 'true'
-        const curVideo = localStorage.getItem('dsh.canvas.show_video') === 'true'
+        const currentScope = getCurrentWorkspaceScope(ctx)
+        const curTask = localStorage.getItem(`dsh.canvas.${currentScope}.show_task`) === 'true'
+        const curDesign = localStorage.getItem(`dsh.canvas.${currentScope}.show_design`) === 'true'
+        const curVideo = localStorage.getItem(`dsh.canvas.${currentScope}.show_video`) === 'true'
 
         menuEl = document.createElement('div')
         menuEl.className = 'dsh-view-menu-popover'
@@ -305,17 +348,16 @@ function setupDynamicViewManager() {
 
         menuEl.onclick = (ev) => ev.stopPropagation()
 
-        // 点击切换开关
-        const bindToggle = (id: string, storageKey: string, bodyAttr: string, kind: string, current: boolean) => {
+        // 绑定工作区独立切换
+        const bindToggle = (id: string, prop: string, bodyAttr: string, kind: string, currentVal: boolean) => {
           const item = menuEl?.querySelector(id) as HTMLElement | null
           if (item) {
             item.onclick = () => {
-              const next = !current
-              localStorage.setItem(storageKey, next ? 'true' : 'false')
+              const next = !currentVal
+              localStorage.setItem(`dsh.canvas.${currentScope}.${prop}`, next ? 'true' : 'false')
               document.body.setAttribute(bodyAttr, next ? 'true' : 'false')
               closeMenu()
 
-              // 开启时自动切过去
               if (next) {
                 const targetTab = tablist.querySelector(`button[data-view-kind="${kind}"]`) as HTMLButtonElement
                 if (targetTab) targetTab.click()
@@ -324,11 +366,10 @@ function setupDynamicViewManager() {
           }
         }
 
-        bindToggle('#itemToggleTask', 'dsh.canvas.show_task', 'data-dsh-show-task', 'task', curTask)
-        bindToggle('#itemToggleDesign', 'dsh.canvas.show_design', 'data-dsh-show-design', 'design', curDesign)
-        bindToggle('#itemToggleVideo', 'dsh.canvas.show_video', 'data-dsh-show-video', 'video', curVideo)
+        bindToggle('#itemToggleTask', 'show_task', 'data-dsh-show-task', 'task', curTask)
+        bindToggle('#itemToggleDesign', 'show_design', 'data-dsh-show-design', 'design', curDesign)
+        bindToggle('#itemToggleVideo', 'show_video', 'data-dsh-show-video', 'video', curVideo)
 
-        // 挂载到父容器
         const parent = tablist.parentElement || tablist
         if (getComputedStyle(parent).position === 'static') {
           (parent as HTMLElement).style.position = 'relative'
@@ -348,5 +389,14 @@ function setupDynamicViewManager() {
 
   const observer = new MutationObserver(() => syncTabBar())
   observer.observe(document.body, { childList: true, subtree: true })
+
+  // 监听会话变更与工作区切换事件，即时刷新当前工作区的视图状态
+  if (ctx.sessions?.list) {
+    ctx.sessions.list.subscribe(() => syncTabBar())
+  }
+  if (ctx.workspaces?.list) {
+    ctx.workspaces.list.subscribe(() => syncTabBar())
+  }
+
   syncTabBar()
 }
