@@ -197,26 +197,18 @@ function setupDynamicViewManager() {
       top: 100%;
       right: 0;
       margin-top: 6px;
-      width: 196px;
+      width: 130px;
       background: var(--dsw-alias-bg-layer-2, #212124);
       border: 1px solid var(--dsw-alias-border-l3, rgba(255, 255, 255, 0.16));
       border-radius: 8px;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-      padding: 6px;
+      padding: 4px;
       z-index: 1000;
       display: flex;
       flex-direction: column;
       gap: 2px;
       font-size: 12.5px;
       color: var(--dsw-alias-label-primary, #f0f0f2);
-    }
-    .dsh-view-menu-header {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--dsw-alias-label-tertiary, #686872);
-      padding: 4px 8px;
-      border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, 0.06));
-      margin-bottom: 4px;
     }
     .dsh-view-menu-item {
       display: flex;
@@ -270,7 +262,7 @@ function setupDynamicViewManager() {
     if (!tablist.querySelector('.dsh-view-add-btn')) {
       const addBtn = document.createElement('button')
       addBtn.className = 'dsh-view-add-btn'
-      addBtn.title = '管理常驻视图 (Task / Design / Video)'
+      addBtn.title = 'Add views'
       addBtn.textContent = '+'
       addBtn.type = 'button'
 
@@ -297,17 +289,16 @@ function setupDynamicViewManager() {
         menuEl = document.createElement('div')
         menuEl.className = 'dsh-view-menu-popover'
         menuEl.innerHTML = `
-          <div class="dsh-view-menu-header">按需常驻扩展视图</div>
           <div class="dsh-view-menu-item" id="itemToggleTask">
-            <span>📋 任务看板 (Task)</span>
+            <span>Task</span>
             <span class="dsh-view-menu-check">${curTask ? '✔' : ''}</span>
           </div>
           <div class="dsh-view-menu-item" id="itemToggleDesign">
-            <span>🎨 设计工坊 (Design)</span>
+            <span>Design</span>
             <span class="dsh-view-menu-check">${curDesign ? '✔' : ''}</span>
           </div>
           <div class="dsh-view-menu-item" id="itemToggleVideo">
-            <span>🎬 视频制作 (Video)</span>
+            <span>Video</span>
             <span class="dsh-view-menu-check">${curVideo ? '✔' : ''}</span>
           </div>
         `
