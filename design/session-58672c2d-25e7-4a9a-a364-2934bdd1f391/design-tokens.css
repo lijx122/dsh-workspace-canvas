@@ -1,0 +1,54 @@
+/* ipw-theme:start */
+:root {
+  /* DSH 原生暗色设计系统与色彩层级 */
+  --dsw-alias-bg-base: #151517;
+  --dsw-alias-bg-layer-1: #1a1a1c;
+  --dsw-alias-bg-layer-2: #212124;
+  --dsw-alias-bg-layer-3: #2a2a2e;
+
+  --dsw-alias-border-l1: rgba(255, 255, 255, 0.06);
+  --dsw-alias-border-l2: rgba(255, 255, 255, 0.10);
+  --dsw-alias-border-l3: rgba(255, 255, 255, 0.16);
+  --dsw-alias-border-l4: rgba(255, 255, 255, 0.24);
+
+  --dsw-alias-label-primary: #f0f0f2;
+  --dsw-alias-label-secondary: #a0a0a8;
+  --dsw-alias-label-tertiary: #686872;
+  --dsw-alias-label-caption: #4e4e56;
+
+  --dsw-alias-interactive-bg-hover: rgba(255, 255, 255, 0.05);
+  --dsw-alias-interactive-bg-active: rgba(255, 255, 255, 0.08);
+
+  --dsw-alias-brand-primary: #4d6bfe;
+  --dsw-alias-button-info-fill: #3b5bfd;
+  --dsw-alias-button-info-hover: #4e6cfd;
+
+  --dsw-alias-state-business-primary: #3b82f6;
+  --dsw-alias-state-warn-primary: #eab308;
+  --dsw-alias-state-success-primary: #10b981;
+  --dsw-alias-state-error-primary: #ef4444;
+
+  --dsw-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --dsw-shadow-lv1: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --dsw-shadow-lv2: 0 4px 12px rgba(0, 0, 0, 0.25);
+
+  /* iDesign 通用映射 */
+  --ipw-color-bg: var(--dsw-alias-bg-base);
+  --ipw-color-surface: var(--dsw-alias-bg-layer-1);
+  --ipw-color-text: var(--dsw-alias-label-primary);
+  --ipw-color-muted: var(--dsw-alias-label-secondary);
+  --ipw-color-border: var(--dsw-alias-border-l2);
+  --ipw-color-primary: var(--dsw-alias-button-info-fill);
+  --ipw-color-secondary: var(--dsw-alias-bg-layer-2);
+  --ipw-color-accent: var(--dsw-alias-brand-primary);
+  --ipw-font-display: var(--dsw-font-family);
+  --ipw-font-body: var(--dsw-font-family);
+  --ipw-content-width: 100%;
+  --ipw-page-padding: 16px;
+  --ipw-section-space: 16px;
+  --ipw-card-bg: var(--dsw-alias-bg-layer-1);
+  --ipw-card-border: var(--dsw-alias-border-l2);
+  --ipw-card-radius: 10px;
+  --ipw-card-shadow: var(--dsw-shadow-lv2);
+}
+/* ipw-theme:end */

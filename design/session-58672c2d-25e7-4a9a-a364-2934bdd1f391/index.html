@@ -1,0 +1,962 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DSH Task 工作台面板</title>
+  <link rel="stylesheet" href="design-tokens.css" data-ipw-design-tokens>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--dsw-alias-bg-base);
+      color: var(--dsw-alias-label-primary);
+      font-family: var(--dsw-font-family);
+      font-size: 13px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* 整体填充 DSH 主会话视区 (ViewArea) */
+    .dsh-view-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      background: var(--dsw-alias-bg-base);
+      padding: 12px 16px 14px 16px;
+      gap: 12px;
+      user-select: none;
+    }
+
+    /* --- 模块 A: 顶部计划与状态条 (DSH 原生紧凑风格) --- */
+    .view-header-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 8px 12px;
+      background: var(--dsw-alias-bg-layer-1);
+      border: 1px solid var(--dsw-alias-border-l1);
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    .plan-meta-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .plan-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--dsw-alias-state-business-primary);
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 4px;
+      padding: 1px 7px;
+      white-space: nowrap;
+    }
+
+    .plan-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--dsw-alias-label-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .plan-progress-mini {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--dsw-alias-label-secondary);
+      flex-shrink: 0;
+    }
+
+    .progress-bar-track {
+      width: 100px;
+      height: 4px;
+      background: var(--dsw-alias-bg-layer-3);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--dsw-alias-brand-primary);
+      border-radius: 2px;
+      transition: width 200ms ease;
+    }
+
+    /* 今日建议聚焦 (DSH 提示条风格，居中自适应) */
+    .today-focus-strip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 440px;
+      flex: 1;
+      background: var(--dsw-alias-bg-layer-2);
+      border: 1px solid var(--dsw-alias-border-l2);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      min-width: 0;
+      transition: border-color 150ms, background 150ms;
+    }
+
+    .today-focus-strip:hover {
+      border-color: var(--dsw-alias-border-l3);
+      background: var(--dsw-alias-bg-layer-3);
+    }
+
+    .focus-tag {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--dsw-alias-state-warn-primary);
+      background: rgba(234, 179, 8, 0.12);
+      padding: 1px 5px;
+      border-radius: 3px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .focus-text {
+      font-size: 12px;
+      color: var(--dsw-alias-label-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 顶部右侧功能区 */
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .sync-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--dsw-alias-label-tertiary);
+      padding: 2px 6px;
+    }
+
+    .sync-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--dsw-alias-state-success-primary);
+    }
+
+    .btn-action-sm {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 28px;
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--dsw-alias-label-primary);
+      background: var(--dsw-alias-bg-layer-2);
+      border: 1px solid var(--dsw-alias-border-l2);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+
+    .btn-action-sm:hover {
+      background: var(--dsw-alias-interactive-bg-hover);
+      border-color: var(--dsw-alias-border-l3);
+    }
+
+    .btn-action-primary {
+      background: var(--dsw-alias-button-info-fill);
+      border-color: transparent;
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    .btn-action-primary:hover {
+      background: var(--dsw-alias-button-info-hover);
+    }
+
+    /* DSH 原生风格的分段控件 (Segmented Control) */
+    .view-segmented-tabs {
+      display: flex;
+      background: var(--dsw-alias-bg-layer-2);
+      border: 1px solid var(--dsw-alias-border-l1);
+      border-radius: 6px;
+      padding: 2px;
+    }
+
+    .seg-tab-btn {
+      border: none;
+      background: transparent;
+      padding: 3px 9px;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--dsw-alias-label-secondary);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+
+    .seg-tab-btn.active {
+      background: var(--dsw-alias-bg-layer-1);
+      color: var(--dsw-alias-label-primary);
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    }
+
+    /* --- 模块 B: 任务泳道排版区 --- */
+    .board-grid-wrapper {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .board-column {
+      display: flex;
+      flex-direction: column;
+      background: var(--dsw-alias-bg-layer-1);
+      border: 1px solid var(--dsw-alias-border-l1);
+      border-radius: 8px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .column-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--dsw-alias-border-l1);
+      flex-shrink: 0;
+    }
+
+    .column-meta-left {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .status-dot-indicator {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .dot-backlog { background: var(--dsw-alias-label-tertiary); }
+    .dot-todo { background: var(--dsw-alias-state-business-primary); }
+    .dot-in-progress { background: var(--dsw-alias-state-warn-primary); }
+    .dot-done { background: var(--dsw-alias-state-success-primary); }
+
+    .column-label {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--dsw-alias-label-primary);
+    }
+
+    .column-badge-count {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: var(--dsw-alias-interactive-bg-hover);
+      color: var(--dsw-alias-label-secondary);
+    }
+
+    .column-quick-add {
+      background: transparent;
+      border: none;
+      color: var(--dsw-alias-label-tertiary);
+      font-size: 15px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+    .column-quick-add:hover {
+      color: var(--dsw-alias-label-primary);
+      background: var(--dsw-alias-interactive-bg-hover);
+    }
+
+    /* 卡片纵向滚动列表容器 */
+    .column-cards-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 8px;
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+      scrollbar-width: thin;
+      scrollbar-color: var(--dsw-alias-border-l3) transparent;
+    }
+
+    .column-cards-container::-webkit-scrollbar {
+      width: 5px;
+    }
+    .column-cards-container::-webkit-scrollbar-thumb {
+      background: var(--dsw-alias-border-l3);
+      border-radius: 3px;
+    }
+
+    /* --- 模块 C: 任务卡片 (Task Card) --- */
+    .dsh-task-card {
+      background: var(--dsw-alias-bg-base);
+      border: 1px solid var(--dsw-alias-border-l2);
+      border-radius: 7px;
+      padding: 9px 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      cursor: pointer;
+      transition: border-color 120ms ease, box-shadow 120ms ease;
+    }
+
+    .dsh-task-card:hover {
+      border-color: var(--dsw-alias-border-l3);
+      box-shadow: var(--dsw-shadow-lv1);
+    }
+
+    .dsh-task-card.is-active-target {
+      border-color: var(--dsw-alias-brand-primary);
+      background: #17181c;
+    }
+
+    .dsh-task-card.is-done {
+      opacity: 0.55;
+    }
+    .dsh-task-card.is-done .card-title-text {
+      text-decoration: line-through;
+      color: var(--dsw-alias-label-secondary);
+    }
+
+    .card-headline-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .card-check-wrap {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .card-checkbox {
+      margin-top: 2px;
+      width: 14px;
+      height: 14px;
+      accent-color: var(--dsw-alias-state-success-primary);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .card-title-text {
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--dsw-alias-label-primary);
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    /* 优先级标签 (低饱和度、专业克制) */
+    .priority-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 0 5px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .priority-p0 {
+      color: var(--dsw-alias-state-error-primary);
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+
+    .priority-p1 {
+      color: var(--dsw-alias-state-warn-primary);
+      background: rgba(234, 179, 8, 0.12);
+      border: 1px solid rgba(234, 179, 8, 0.25);
+    }
+
+    .priority-p2 {
+      color: var(--dsw-alias-label-secondary);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--dsw-alias-border-l1);
+    }
+
+    .card-summary-desc {
+      font-size: 11.5px;
+      line-height: 1.45;
+      color: var(--dsw-alias-label-secondary);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-left: 21px;
+    }
+
+    .card-tags-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-left: 21px;
+    }
+
+    .card-tag-item {
+      font-size: 10px;
+      color: var(--dsw-alias-label-secondary);
+      background: var(--dsw-alias-bg-layer-2);
+      border: 1px solid var(--dsw-alias-border-l1);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    .card-bottom-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10.5px;
+      color: var(--dsw-alias-label-tertiary);
+      padding-top: 5px;
+      border-top: 1px solid var(--dsw-alias-border-l1);
+      margin-left: 21px;
+    }
+
+    .source-label {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .src-ai-text {
+      color: #93c5fd;
+    }
+
+    .card-inline-action-btn {
+      background: transparent;
+      border: none;
+      color: var(--dsw-alias-label-secondary);
+      font-size: 10.5px;
+      cursor: pointer;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    .card-inline-action-btn:hover {
+      color: var(--dsw-alias-label-primary);
+      background: var(--dsw-alias-interactive-bg-hover);
+    }
+
+    /* 快捷添加任务轻量对话框 */
+    .dialog-mask {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .dialog-mask.open {
+      display: flex;
+    }
+
+    .dialog-card {
+      width: 420px;
+      background: var(--dsw-alias-bg-layer-1);
+      border: 1px solid var(--dsw-alias-border-l3);
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: var(--dsw-shadow-lv2);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .dialog-header {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--dsw-alias-label-primary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .dialog-input {
+      width: 100%;
+      background: var(--dsw-alias-bg-base);
+      border: 1px solid var(--dsw-alias-border-l2);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 12.5px;
+      color: var(--dsw-alias-label-primary);
+      outline: none;
+      font-family: inherit;
+    }
+    .dialog-input:focus {
+      border-color: var(--dsw-alias-brand-primary);
+    }
+
+    .dialog-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .dialog-select {
+      flex: 1;
+      background: var(--dsw-alias-bg-base);
+      border: 1px solid var(--dsw-alias-border-l2);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 12px;
+      color: var(--dsw-alias-label-primary);
+      outline: none;
+    }
+
+    .dialog-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body data-ipw-theme-role="page">
+
+  <!-- DSH 视图容器：渲染在右侧上方 viewArea 内 -->
+  <div class="dsh-view-container" id="taskViewRoot">
+
+    <!-- 模块 A: 顶部计划与状态条 (对齐 DSH 官方紧凑条设计) -->
+    <header class="view-header-strip" data-ipw-theme-role="card">
+      
+      <!-- 左侧：目标与进度 -->
+      <div class="plan-meta-group">
+        <span class="plan-badge">申论系统</span>
+        <h1 class="plan-title" id="planTitle">历年真题分类突破与答题规范</h1>
+        <div class="plan-progress-mini">
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="progressFill" style="width: 50%;"></div>
+          </div>
+          <span id="progressSummary" style="font-weight: 500;">4 / 8</span>
+        </div>
+      </div>
+
+      <!-- 中间：今日建议聚焦 (点击平滑定位至任务卡片) -->
+      <div class="today-focus-strip" id="focusAnchor" title="点击定位到该聚焦任务">
+        <span class="focus-tag">今日聚焦</span>
+        <span class="focus-text" id="focusTaskTitle">大作文论点框架搭建与分论点排布 (P0)</span>
+      </div>
+
+      <!-- 右侧：同步状态、添加按钮与双模切换 -->
+      <div class="header-controls">
+        <div class="sync-indicator" title="工作区数据文件状态">
+          <span class="sync-dot"></span>
+          <span id="syncText">tasks.json 已同步</span>
+        </div>
+
+        <button class="btn-action-sm btn-action-primary" id="btnOpenNewTask">
+          <span>+ 任务</span>
+        </button>
+
+        <!-- DSH 视图分段切换 (看板 / 原生对话) -->
+        <div class="view-segmented-tabs">
+          <button class="seg-tab-btn active" id="tabKanban">看板</button>
+          <button class="seg-tab-btn" id="tabChat" onclick="alert('提示：在真实 DSH 插件中，此按钮将平滑翻转至默认会话消息流 (Chat View)，保留所有 AI 思考轮次与工具调用记录。')">对话</button>
+        </div>
+      </div>
+
+    </header>
+
+    <!-- 模块 B: 4 列任务排版泳道 -->
+    <div class="board-grid-wrapper" id="boardColumns">
+
+      <!-- 列 1: 计划备选 -->
+      <section class="board-column" data-column="backlog">
+        <div class="column-header-row">
+          <div class="column-meta-left">
+            <span class="status-dot-indicator dot-backlog"></span>
+            <span class="column-label">计划备选</span>
+            <span class="column-badge-count" id="count-backlog">2</span>
+          </div>
+          <button class="column-quick-add" onclick="showCreateDialog('backlog')" title="向此列添加任务">+</button>
+        </div>
+        <div class="column-cards-container" id="cards-backlog">
+          
+          <div class="dsh-task-card" data-task-id="t-001">
+            <div class="card-headline-row">
+              <div class="card-check-wrap">
+                <input type="checkbox" class="card-checkbox" onchange="handleTaskCheck('t-001', this)">
+                <span class="card-title-text">政策理论专题与时政词库归纳</span>
+              </div>
+              <span class="priority-badge priority-p2">P2</span>
+            </div>
+            <div class="card-summary-desc">整理新质生产力与基层治理重点表述，建构标准化规范语言词库。</div>
+            <div class="card-tags-wrap">
+              <span class="card-tag-item">#政策理论</span>
+              <span class="card-tag-item">#语料积累</span>
+            </div>
+            <div class="card-bottom-bar">
+              <span class="source-label">👤 人工</span>
+              <button class="card-inline-action-btn" onclick="moveTaskCol('t-001', 'todo')">移入待办 →</button>
+            </div>
+          </div>
+
+          <div class="dsh-task-card" data-task-id="t-002">
+            <div class="card-headline-row">
+              <div class="card-check-wrap">
+                <input type="checkbox" class="card-checkbox" onchange="handleTaskCheck('t-002', this)">
+                <span class="card-title-text">全真模考计时复盘 (2024国考副省)</span>
+              </div>
+              <span class="priority-badge priority-p1">P1</span>
+            </div>
+            <div class="card-summary-desc">3 小时完整闭卷作答，结合题干打分要点逐条反思失分逻辑。</div>
+            <div class="card-tags-wrap">
+              <span class="card-tag-item">#全真模考</span>
+            </div>
+            <div class="card-bottom-bar">
+              <span class="source-label src-ai-text">✨ AI规划</span>
+              <button class="card-inline-action-btn" onclick="moveTaskCol('t-002', 'todo')">移入待办 →</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 列 2: 今日待办 -->
+      <section class="board-column" data-column="todo">
+        <div class="column-header-row">
+          <div class="column-meta-left">
+            <span class="status-dot-indicator dot-todo"></span>
+            <span class="column-label">今日待办</span>
+            <span class="column-badge-count" id="count-todo">2</span>
+          </div>
+          <button class="column-quick-add" onclick="showCreateDialog('todo')" title="向此列添加任务">+</button>
+        </div>
+        <div class="column-cards-container" id="cards-todo">
+          
+          <div class="dsh-task-card" data-task-id="t-003">
+            <div class="card-headline-row">
+              <div class="card-check-wrap">
+                <input type="checkbox" class="card-checkbox" onchange="handleTaskCheck('t-003', this)">
+                <span class="card-title-text">2023 行政执法第一题要素提炼</span>
+              </div>
+              <span class="priority-badge priority-p0">P0</span>
+            </div>
+            <div class="card-summary-desc">归纳执法规范化 3 个核心抓手，提炼'刚柔相济'关键点，控制在 150 字内。</div>
+            <div class="card-tags-wrap">
+              <span class="card-tag-item">#真题精练</span>
+              <span class="card-tag-item">#要素归纳</span>
+            </div>
+            <div class="card-bottom-bar">
+              <span class="source-label src-ai-text">✨ AI拆解</span>
+              <button class="card-inline-action-btn" onclick="moveTaskCol('t-003', 'in_progress')">开始推进 →</button>
+            </div>
+          </div>
+
+          <div class="dsh-task-card" data-task-id="t-004">
+            <div class="card-headline-row">
+              <div class="card-check-wrap">
+                <input type="checkbox" class="card-checkbox" onchange="handleTaskCheck('t-004', this)">
+                <span class="card-title-text">提出对策题措施针对性自检</span>
+              </div>
+              <span class="priority-badge priority-p1">P1</span>
+            </div>
+            <div class="card-summary-desc">依据主体适格性、措施可操作性、保障落地性三维度建立对策清单。</div>
+            <div class="card-tags-wrap">
+              <span class="card-tag-item">#对策题</span>
+            </div>
+            <div class="card-bottom-bar">
+              <span class="source-label">👤 人工</span>
+              <button class="card-inline-action-btn" onclick="moveTaskCol('t-004', 'in_progress')">开始推进 →</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 列 3: 进行中 -->
+      <section class="board-column" data-column="in_progress">
+        <div class="column-header-row">
+          <div class="column-meta-left">
+            <span class="status-dot-indicator dot-in-progress"></span>
+            <span class="column-label">进行中</span>
+            <span class="column-badge-count" id="count-in_progress">2</span>
+          </div>
+          <button class="column-quick-add" onclick="showCreateDialog('in_progress')" title="向此列添加任务">+</button>
+        </div>
+        <div class="column-cards-container" id="cards-in_progress">
+          
+          <div class="dsh-task-card is-active-target" data-task-id="t-005" id="card-focus-target">
+            <div class="card-headline-row">
+              <div class="card-check-wrap">
+                <input type="checkbox" class="card-checkbox" onchange="handleTaskCheck('t-005', this)">
+                <span class="card-title-text">大作文论点框架搭建与分论点排布</span>
+              </div>
+              <span class="priority-badge priority-p0">P0</span>
+            </div>
+            <div class="card-summary-desc">按观念筑基、制度立柱、民生落脚 3 个维度推演排布对仗小标题。</div>
+            <div class="card-tags-wrap">
+              <span class="card-tag-item">#大作文</span>
+              <span class="card-tag-item">#论证框架</span>
+            </div>
+            <div class="card-bottom-bar">
+              <span class="source-label">👤 人工</span>
+              <button class="card-inline-action-btn" onclick="moveTaskCol('t-005', 'done')">完成 ✔</button>
+            </div>
+          </div>
+
+          <div class="dsh-task-card" data-task-id="t-006">
+            <div class="card-headline-row">
+              <div class="card-check-wrap">
+                <input type="checkbox" class="card-checkbox" onchange="handleTaskCheck('t-006', this)">
+                <span class="card-title-text">综合分析题反向例证论据补充</span>
+              </div>
+              <span class="priority-badge priority-p1">P1</span>
+            </div>
+            <div class="card-summary-desc">针对三段论论证补充正反对比案例，强化透彻度。</div>
+            <div class="card-tags-wrap">
+              <span class="card-tag-item">#综合分析</span>
+            </div>
+            <div class="card-bottom-bar">
+              <span class="source-label src-ai-text">✨ AI拆解</span>
+              <button class="card-inline-action-btn" onclick="moveTaskCol('t-006', 'done')">完成 ✔</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 列 4: 已完成 -->
+      <section class="board-column" data-column="done">
+        <div class="column-header-row">
+          <div class="column-meta-left">
+            <span class="status-dot-indicator dot-done"></span>
+            <span class="column-label">已完成</span>
+            <span class="column-badge-count" id="count-done">2</span>
+          </div>
+          <button class="column-quick-add" onclick="showCreateDialog('done')" title="向此列添加任务">+</button>
+        </div>
+        <div class="column-cards-container" id="cards-done">
+          
+          <div class="dsh-task-card is-done" data-task-id="t-007">
+            <div class="card-headline-row">
+              <div class="card-check-wrap">
+                <input type="checkbox" class="card-checkbox" checked onchange="handleTaskCheck('t-007', this)">
+                <span class="card-title-text">历年高频论据分类卡片建立</span>
+              </div>
+              <span class="priority-badge priority-p2">P2</span>
+            </div>
+            <div class="card-summary-desc">已整理沉淀至工作区 docs/quotes.md，完成三类论据整理。</div>
+            <div class="card-tags-wrap">
+              <span class="card-tag-item">#论据库</span>
+            </div>
+            <div class="card-bottom-bar">
+              <span class="source-label">👤 人工</span>
+              <button class="card-inline-action-btn" onclick="moveTaskCol('t-007', 'todo')">↩ 放回待办</button>
+            </div>
+          </div>
+
+          <div class="dsh-task-card is-done" data-task-id="t-008">
+            <div class="card-headline-row">
+              <div class="card-check-wrap">
+                <input type="checkbox" class="card-checkbox" checked onchange="handleTaskCheck('t-008', this)">
+                <span class="card-title-text">公文写作格式规范自检表制定</span>
+              </div>
+              <span class="priority-badge priority-p1">P1</span>
+            </div>
+            <div class="card-summary-desc">覆盖通知、公开信、调研报告的标题、称谓与落款规范。</div>
+            <div class="card-tags-wrap">
+              <span class="card-tag-item">#公文写作</span>
+            </div>
+            <div class="card-bottom-bar">
+              <span class="source-label src-ai-text">✨ AI生成</span>
+              <button class="card-inline-action-btn" onclick="moveTaskCol('t-008', 'todo')">↩ 放回待办</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+
+  </div>
+
+  <!-- 轻量新建任务弹窗 -->
+  <div class="dialog-mask" id="newTaskModal">
+    <div class="dialog-card">
+      <div class="dialog-header">
+        <span>添加任务卡片</span>
+        <span style="cursor:pointer; color:var(--dsw-alias-label-tertiary)" onclick="hideCreateDialog()">✕</span>
+      </div>
+      <input type="text" class="dialog-input" id="inputTaskTitle" placeholder="任务名称 (例：2024真题贯彻执行小题要素归纳)">
+      <input type="text" class="dialog-input" id="inputTaskDesc" placeholder="任务说明或拆解要点 (选填)">
+      
+      <div class="dialog-row">
+        <select class="dialog-select" id="selectTargetCol">
+          <option value="todo">今日待办</option>
+          <option value="in_progress">进行中</option>
+          <option value="backlog">计划备选</option>
+          <option value="done">已完成</option>
+        </select>
+        <select class="dialog-select" id="selectPriority">
+          <option value="P0">P0 (紧急必做)</option>
+          <option value="P1" selected>P1 (重要)</option>
+          <option value="P2">P2 (普通)</option>
+        </select>
+      </div>
+
+      <input type="text" class="dialog-input" id="inputTags" placeholder="标签，以逗号分隔 (例：#大作文, #真题)">
+
+      <div class="dialog-footer">
+        <button class="btn-action-sm" onclick="hideCreateDialog()">取消</button>
+        <button class="btn-action-sm btn-action-primary" onclick="saveNewTask()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 刷新各列计数与整体进度
+    function refreshMetrics() {
+      const cols = ['backlog', 'todo', 'in_progress', 'done'];
+      let total = 0;
+      let completed = 0;
+
+      cols.forEach(col => {
+        const list = document.getElementById('cards-' + col);
+        const count = list ? list.children.length : 0;
+        const countBadge = document.getElementById('count-' + col);
+        if (countBadge) countBadge.innerText = count;
+        total += count;
+        if (col === 'done') completed = count;
+      });
+
+      const fill = document.getElementById('progressFill');
+      const summary = document.getElementById('progressSummary');
+      if (total > 0) {
+        const pct = Math.round((completed / total) * 100);
+        if (fill) fill.style.width = pct + '%';
+        if (summary) summary.innerText = `${completed} / ${total} (${pct}%)`;
+      }
+    }
+
+    // 任务列移动
+    function moveTaskCol(taskId, targetCol) {
+      const card = document.querySelector(`[data-task-id="${taskId}"]`);
+      const targetList = document.getElementById('cards-' + targetCol);
+      if (card && targetList) {
+        targetList.appendChild(card);
+        const check = card.querySelector('.card-checkbox');
+        if (check) check.checked = (targetCol === 'done');
+        if (targetCol === 'done') {
+          card.classList.add('is-done');
+        } else {
+          card.classList.remove('is-done');
+        }
+        refreshMetrics();
+      }
+    }
+
+    function handleTaskCheck(taskId, checkbox) {
+      moveTaskCol(taskId, checkbox.checked ? 'done' : 'todo');
+    }
+
+    // 点击今日聚焦平滑定位
+    document.getElementById('focusAnchor').addEventListener('click', () => {
+      const target = document.getElementById('card-focus-target');
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.style.borderColor = 'var(--dsw-alias-brand-primary)';
+        target.style.boxShadow = 'var(--dsw-shadow-lv2)';
+      }
+    });
+
+    // 模态弹窗控制
+    let currentDefaultCol = 'todo';
+    function showCreateDialog(col) {
+      currentDefaultCol = col || 'todo';
+      document.getElementById('selectTargetCol').value = currentDefaultCol;
+      document.getElementById('newTaskModal').classList.add('open');
+      document.getElementById('inputTaskTitle').focus();
+    }
+
+    function hideCreateDialog() {
+      document.getElementById('newTaskModal').classList.remove('open');
+      document.getElementById('inputTaskTitle').value = '';
+      document.getElementById('inputTaskDesc').value = '';
+      document.getElementById('inputTags').value = '';
+    }
+
+    document.getElementById('btnOpenNewTask').addEventListener('click', () => showCreateDialog('todo'));
+
+    function saveNewTask() {
+      const title = document.getElementById('inputTaskTitle').value.trim();
+      if (!title) return alert('请输入任务名称');
+      const desc = document.getElementById('inputTaskDesc').value.trim();
+      const col = document.getElementById('selectTargetCol').value;
+      const priority = document.getElementById('selectPriority').value;
+      const rawTags = document.getElementById('inputTags').value.trim();
+      const tags = rawTags ? rawTags.split(/[,，\s]+/) : ['#申论'];
+
+      const newId = 't-' + Date.now();
+      const pClass = priority === 'P0' ? 'priority-p0' : (priority === 'P1' ? 'priority-p1' : 'priority-p2');
+
+      const card = document.createElement('div');
+      card.className = 'dsh-task-card' + (col === 'done' ? ' is-done' : '');
+      card.dataset.taskId = newId;
+      card.innerHTML = `
+        <div class="card-headline-row">
+          <div class="card-check-wrap">
+            <input type="checkbox" class="card-checkbox" ${col === 'done' ? 'checked' : ''} onchange="handleTaskCheck('${newId}', this)">
+            <span class="card-title-text">${title}</span>
+          </div>
+          <span class="priority-badge ${pClass}">${priority}</span>
+        </div>
+        ${desc ? `<div class="card-summary-desc">${desc}</div>` : ''}
+        <div class="card-tags-wrap">
+          ${tags.map(t => `<span class="card-tag-item">${t.startsWith('#') ? t : '#' + t}</span>`).join('')}
+        </div>
+        <div class="card-bottom-bar">
+          <span class="source-label">👤 人工</span>
+          <button class="card-inline-action-btn" onclick="moveTaskCol('${newId}', 'in_progress')">流转 →</button>
+        </div>
+      `;
+
+      document.getElementById('cards-' + col).prepend(card);
+      hideCreateDialog();
+      refreshMetrics();
+    }
+
+    // 初始化运行
+    refreshMetrics();
+  </script>
+
+</body>
+</html>

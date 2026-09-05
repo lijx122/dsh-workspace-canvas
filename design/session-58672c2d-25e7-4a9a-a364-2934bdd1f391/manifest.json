@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "ipollowork.deepseek-harness.design",
+  "version": "1.0.0",
+  "kind": "design",
+  "category": "site",
+  "subcategory": "website",
+  "style": "minimal",
+  "tags": [
+    "deepseek-harness",
+    "studio"
+  ],
+  "surface": "design",
+  "title": "Task 工作台面板设计原型 - DSH Canvas",
+  "description": "基于 DSH 工作区自适应检测的 Task 工作台看板原型，支持上方任务进度排版与下方常驻对话协同。",
+  "cover": "index.html",
+  "entry": "index.html",
+  "source": {
+    "name": "iPolloWork",
+    "license": "MIT"
+  },
+  "designSystem": {
+    "tokenVersion": 1,
+    "editableGroups": [
+      "theme",
+      "background",
+      "typography",
+      "components"
+    ],
+    "tokens": "design-tokens.css",
+    "variables": []
+  },
+  "applyChecklist": [
+    "Preserve the current document structure and linked design token contract."
+  ],
+  "minimumAppVersion": "0.21.2"
+}

@@ -1,0 +1,62 @@
+{
+  "id": "template-task-shenlun",
+  "name": "申论真题突破与备考任务看板",
+  "category": "study",
+  "description": "申论历年真题归纳、题型突破、对策检验与大作文论证框架任务排版模板",
+  "targetFile": "tasks.json",
+  "data": {
+    "plan": {
+      "target": "申论系统深度推演与历年真题突破",
+      "currentStage": "阶段一：题型归纳与真题精析",
+      "focusTaskId": "task-002"
+    },
+    "columns": [
+      { "id": "backlog", "title": "计划备选" },
+      { "id": "todo", "title": "今日待办" },
+      { "id": "in_progress", "title": "进行中" },
+      { "id": "done", "title": "已完成" }
+    ],
+    "tasks": [
+      {
+        "id": "task-001",
+        "columnId": "todo",
+        "title": "2023 行政执法第一题要素提炼",
+        "desc": "归纳执法规范化 3 个核心抓手，提炼'刚柔相济'关键点，控制在 150 字内。",
+        "priority": "P0",
+        "tags": ["真题精练", "要素归纳"],
+        "source": "ai",
+        "createdAt": "2026-09-04T10:00:00Z"
+      },
+      {
+        "id": "task-002",
+        "columnId": "in_progress",
+        "title": "大作文论点框架搭建与分论点排布",
+        "desc": "按观念筑基、制度立柱、民生落脚 3 个维度推演排布对仗小标题。",
+        "priority": "P0",
+        "tags": ["大作文", "论证框架"],
+        "source": "manual",
+        "createdAt": "2026-09-04T11:30:00Z"
+      },
+      {
+        "id": "task-003",
+        "columnId": "backlog",
+        "title": "政策理论专题与时政词库归纳",
+        "desc": "整理新质生产力与基层治理重点表述，建构标准化规范语言词库。",
+        "priority": "P2",
+        "tags": ["政策理论", "语料积累"],
+        "source": "manual",
+        "createdAt": "2026-09-04T09:00:00Z"
+      },
+      {
+        "id": "task-004",
+        "columnId": "done",
+        "title": "公文写作格式规范自检表制定",
+        "desc": "覆盖通知、公开信、调研报告的标题、称谓与落款规范。",
+        "priority": "P1",
+        "tags": ["公文写作"],
+        "source": "ai",
+        "createdAt": "2026-09-03T16:00:00Z"
+      }
+    ]
+  }
+}
