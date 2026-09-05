@@ -6,7 +6,7 @@ import { readFile, writeFile, access } from 'node:fs/promises'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const TEMPLATES_DIR = resolve(__dirname, '../templates')
 
-export const inject = ['webServer', 'workspaces']
+export const inject = ['webServer', 'workspaceRegistry']
 
 export interface WorkspaceStatusResult {
   hasTasks: boolean
@@ -54,9 +54,11 @@ export function apply(ctx: Context) {
             const body = bodyStr ? JSON.parse(bodyStr) : {}
 
             const workspaceId = body.workspaceId
-            const workspacesList = ctx.workspaces?.list?.getSnapshot?.()?.items ?? []
-            const workspace = workspacesList.find((w: any) => w.workspaceId === workspaceId)
-            const workspaceCwd = workspace ? workspace.path : body.cwd
+            let workspaceCwd = body.cwd
+            if (!workspaceCwd && workspaceId && ctx.workspaceRegistry) {
+              const ws = ctx.workspaceRegistry.get(workspaceId)
+              if (ws) workspaceCwd = ws.path
+            }
 
             if (!workspaceCwd) {
               return sendJson(400, { ok: false, error: '未找到指定工作区目录' })
