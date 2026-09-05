@@ -1,24 +1,42 @@
 import React, { useEffect, useState, useRef } from 'react'
 
-export interface TaskItem {
+export interface PlanItem {
   id: string
-  columnId: string
+  timeSlot: string
+  module: string
   title: string
-  desc?: string
-  priority: 'P0' | 'P1' | 'P2'
-  tags?: string[]
-  source?: 'ai' | 'manual'
-  createdAt?: string
+  targetMinutes: number
+  done: boolean
+  resource?: string
+  actualMinutes?: number
 }
 
-export interface TasksData {
-  plan: {
+export interface Checkpoint {
+  date: string
+  criteria: string
+  action: string
+}
+
+export interface GongkaoPlanData {
+  profile: {
     target: string
-    currentStage: string
-    focusTaskId?: string
+    stage: string
+    currentWeek: string
+    daysLeft: number
+    coreRule: string
   }
-  columns: Array<{ id: string; title: string }>
-  tasks: TaskItem[]
+  weeklySchedule: Record<string, PlanItem[]>
+  checkpoints: Checkpoint[]
+}
+
+const WEEK_NAMES: Record<string, string> = {
+  '1': '周一',
+  '2': '周二',
+  '3': '周三',
+  '4': '周四',
+  '5': '周五',
+  '6': '周六',
+  '7': '周日'
 }
 
 export function TaskView({
@@ -29,149 +47,143 @@ export function TaskView({
 }: {
   workspaceId: string
   cwd: string
-  initialData: TasksData | null
-  onSave: (data: TasksData) => Promise<void>
+  initialData: any
+  onSave: (data: any) => Promise<void>
 }) {
-  const [data, setData] = useState<TasksData | null>(initialData)
-  const [templates, setTemplates] = useState<any[]>([])
-  const [syncing, setSyncing] = useState(false)
-  const [modalCol, setModalCol] = useState<string | null>(null)
-  const [newTitle, setNewTitle] = useState('')
-  const [newDesc, setNewDesc] = useState('')
-  const [newPriority, setNewPriority] = useState<'P0' | 'P1' | 'P2'>('P1')
-  const [newTags, setNewTags] = useState('')
+  const normalizeData = (raw: any): GongkaoPlanData | null => {
+    if (!raw) return null
+    if (raw.weeklySchedule) return raw as GongkaoPlanData
+    return null
+  }
 
-  // 如果没有数据，拉取模板供用户首次选择
+  const [data, setData] = useState<GongkaoPlanData | null>(() => normalizeData(initialData))
+  const [activeDay, setActiveDay] = useState<string>(() => {
+    const d = new Date().getDay()
+    return d === 0 ? '7' : String(d)
+  })
+
+  // 计时器状态
+  const [activeTimerTask, setActiveTimerTask] = useState<PlanItem | null>(null)
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(0)
+  const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false)
+  const [syncing, setSyncing] = useState<boolean>(false)
+
+  // 首次拉取模板如果未初始化
   useEffect(() => {
     if (!data) {
       fetch('/api/workspace-canvas/templates')
         .then(res => res.json())
         .then(res => {
-          if (res.ok) setTemplates(res.templates)
+          if (res.ok && res.templates?.length) {
+            const defaultTpl = res.templates.find((t: any) => t.id === 'template-task-shenlun') || res.templates[0]
+            if (defaultTpl) setData(defaultTpl.data)
+          }
         })
         .catch(console.error)
     }
   }, [data])
 
-  // 应用模板
-  const handleApplyTemplate = async (templateId: string) => {
-    setSyncing(true)
-    try {
-      const res = await fetch('/api/workspace-canvas/apply-template', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId, cwd, templateId })
-      })
-      const result = await res.json()
-      if (result.ok) {
-        setData(result.tasksData)
-      }
-    } finally {
-      setSyncing(false)
+  // 倒计时心跳
+  useEffect(() => {
+    let timer: any = null
+    if (isTimerRunning && secondsRemaining > 0) {
+      timer = setInterval(() => {
+        setSecondsRemaining(prev => {
+          if (prev <= 1) {
+            clearInterval(timer)
+            setIsTimerRunning(false)
+            // 计时结束：自动标记完成！
+            if (activeTimerTask) {
+              handleAutoFinish(activeTimerTask.id, activeTimerTask.targetMinutes)
+            }
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
     }
+    return () => clearInterval(timer)
+  }, [isTimerRunning, secondsRemaining, activeTimerTask])
+
+  // 自动完成
+  const handleAutoFinish = (taskId: string, targetMin: number) => {
+    updateDaySchedule(items =>
+      items.map(it => (it.id === taskId ? { ...it, done: true, actualMinutes: targetMin } : it))
+    )
+    alert(`🎉 恭喜！任务 [${activeTimerTask?.title}] 限时完成，已自动勾选！`)
   }
 
-  // 保存数据
-  const updateData = async (updater: (prev: TasksData) => TasksData) => {
+  // 启动某任务计时
+  const handleStartTaskTimer = (task: PlanItem) => {
+    if (activeTimerTask?.id === task.id && isTimerRunning) {
+      setIsTimerRunning(false)
+      return
+    }
+    setActiveTimerTask(task)
+    setSecondsRemaining(task.targetMinutes * 60)
+    setIsTimerRunning(true)
+  }
+
+  // 手动结束/提前交卷
+  const handleFinishTimerEarly = () => {
+    if (!activeTimerTask) return
+    const elapsedSec = (activeTimerTask.targetMinutes * 60) - secondsRemaining
+    const actualMin = Math.max(1, Math.round(elapsedSec / 60))
+    updateDaySchedule(items =>
+      items.map(it => (it.id === activeTimerTask.id ? { ...it, done: true, actualMinutes: actualMin } : it))
+    )
+    setIsTimerRunning(false)
+    setActiveTimerTask(null)
+    setSecondsRemaining(0)
+  }
+
+  // 更新当前星期几的计划
+  const updateDaySchedule = async (updater: (items: PlanItem[]) => PlanItem[]) => {
     if (!data) return
-    const next = updater(data)
-    setData(next)
+    const currentList = data.weeklySchedule[activeDay] || []
+    const updatedList = updater(currentList)
+    const nextData: GongkaoPlanData = {
+      ...data,
+      weeklySchedule: {
+        ...data.weeklySchedule,
+        [activeDay]: updatedList
+      }
+    }
+    setData(nextData)
     setSyncing(true)
     try {
-      await onSave(next)
+      await onSave(nextData)
     } finally {
-      setTimeout(() => setSyncing(false), 400)
+      setTimeout(() => setSyncing(false), 300)
     }
   }
 
-  // 状态流转
-  const handleMoveTask = (taskId: string, targetColId: string) => {
-    updateData(prev => ({
-      ...prev,
-      tasks: prev.tasks.map(t => (t.id === taskId ? { ...t, columnId: targetColId } : t))
-    }))
+  // 单独勾选切换
+  const handleToggleDone = (taskId: string, done: boolean) => {
+    updateDaySchedule(items =>
+      items.map(it => (it.id === taskId ? { ...it, done } : it))
+    )
   }
 
-  // 勾选完成
-  const handleToggleCheck = (taskId: string, currentDone: boolean) => {
-    handleMoveTask(taskId, currentDone ? 'todo' : 'done')
-  }
-
-  // 创建任务
-  const handleCreateTask = () => {
-    if (!newTitle.trim() || !modalCol) return
-    const tags = newTags.trim() ? newTags.split(/[,，\s]+/) : []
-    const newTask: TaskItem = {
-      id: `task-${Date.now()}`,
-      columnId: modalCol,
-      title: newTitle.trim(),
-      desc: newDesc.trim() || undefined,
-      priority: newPriority,
-      tags: tags.length ? tags : undefined,
-      source: 'manual',
-      createdAt: new Date().toISOString()
-    }
-    updateData(prev => ({
-      ...prev,
-      tasks: [newTask, ...prev.tasks]
-    }))
-    setModalCol(null)
-    setNewTitle('')
-    setNewDesc('')
-    setNewTags('')
+  // 格式化秒数为 MM:SS
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60)
+    const s = secs % 60
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   }
 
   if (!data) {
     return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-        padding: '32px',
-        color: 'var(--dsw-alias-label-primary, #f0f0f2)',
-        background: 'var(--dsw-alias-bg-base, #151517)',
-        gap: '20px'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px' }}>初始化工作区任务看板</h2>
-          <p style={{ fontSize: '13px', color: 'var(--dsw-alias-label-secondary, #a0a0a8)' }}>
-            当前工作区尚未建立 tasks.json，请选择预置模板一键就绪
-          </p>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', maxWidth: '640px', width: '100%' }}>
-          {templates.map(tpl => (
-            <div
-              key={tpl.id}
-              onClick={() => handleApplyTemplate(tpl.id)}
-              style={{
-                background: 'var(--dsw-alias-bg-layer-1, #1a1a1c)',
-                border: '1px solid var(--dsw-alias-border-l2, rgba(255,255,255,0.1))',
-                borderRadius: '10px',
-                padding: '16px',
-                cursor: 'pointer',
-                transition: 'border-color 150ms ease, transform 150ms ease'
-              }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--dsw-alias-brand-primary, #4d6bfe)')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--dsw-alias-border-l2, rgba(255,255,255,0.1))')}
-            >
-              <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>{tpl.name}</div>
-              <div style={{ fontSize: '12px', color: 'var(--dsw-alias-label-secondary, #a0a0a8)', lineHeight: 1.45 }}>{tpl.description}</div>
-              <div style={{ marginTop: '12px', fontSize: '11px', color: 'var(--dsw-alias-brand-primary, #4d6bfe)', fontWeight: 600 }}>点击选用此模板 →</div>
-            </div>
-          ))}
-        </div>
+      <div style={{ display: 'grid', placeContent: 'center', height: '100%', color: '#94a3b8' }}>
+        正在初始化公考备战计划看板...
       </div>
     )
   }
 
-  // 指标统计
-  const total = data.tasks.length
-  const completed = data.tasks.filter(t => t.columnId === 'done').length
-  const pct = total > 0 ? Math.round((completed / total) * 100) : 0
-  const focusTask = data.tasks.find(t => t.id === data.plan.focusTaskId)
+  const dayTasks = data.weeklySchedule[activeDay] || []
+  const completedCount = dayTasks.filter(t => t.done).length
+  const totalCount = dayTasks.length
+  const dayProgressPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
   return (
     <div style={{
@@ -180,403 +192,309 @@ export function TaskView({
       height: '100%',
       width: '100%',
       background: 'var(--dsw-alias-bg-base, #151517)',
-      padding: '12px 16px',
+      padding: '12px 18px',
       gap: '10px',
-      userSelect: 'none',
       color: 'var(--dsw-alias-label-primary, #f0f0f2)',
       fontFamily: 'var(--dsw-font-family, sans-serif)',
-      fontSize: '13px'
+      fontSize: '13px',
+      userSelect: 'none',
+      overflowY: 'auto'
     }}>
-      {/* 顶部状态与聚焦栏 */}
-      <header style={{
+      {/* 顶部目标与铁律横幅 */}
+      <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: '12px',
         padding: '8px 12px',
         background: 'var(--dsw-alias-bg-layer-1, #1a1a1c)',
         border: '1px solid var(--dsw-alias-border-l1, rgba(255,255,255,0.06))',
         borderRadius: '8px',
+        gap: '12px',
         flexShrink: 0
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
           <span style={{
             fontSize: '11px',
-            fontWeight: 600,
-            color: 'var(--dsw-alias-state-business-primary, #3b82f6)',
-            background: 'rgba(59, 130, 246, 0.1)',
-            border: '1px solid rgba(59, 130, 246, 0.2)',
+            fontWeight: 700,
+            color: '#3b82f6',
+            background: 'rgba(59, 130, 246, 0.12)',
+            padding: '2px 7px',
             borderRadius: '4px',
-            padding: '1px 6px',
             whiteSpace: 'nowrap'
           }}>
-            {data.plan.currentStage}
+            {data.profile.stage}
           </span>
-          <span style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {data.plan.target}
+          <span style={{ fontSize: '12.5px', fontWeight: 600 }}>{data.profile.target}</span>
+          <span style={{ fontSize: '11.5px', color: '#eab308', marginLeft: '6px' }}>
+            ⚡ 铁律：{data.profile.coreRule}
           </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: 'var(--dsw-alias-label-secondary, #a0a0a8)', flexShrink: 0 }}>
-            <div style={{ width: '80px', height: '4px', background: 'var(--dsw-alias-bg-layer-3, #2a2a2e)', borderRadius: '2px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${pct}%`, background: 'var(--dsw-alias-brand-primary, #4d6bfe)', borderRadius: '2px', transition: 'width 200ms' }} />
-            </div>
-            <span>{completed} / {total}</span>
-          </div>
         </div>
 
-        {focusTask && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            maxWidth: '380px',
-            flex: 1,
-            background: 'var(--dsw-alias-bg-layer-2, #212124)',
-            border: '1px solid var(--dsw-alias-border-l2, rgba(255,255,255,0.1))',
-            borderRadius: '6px',
-            padding: '3px 8px',
-            minWidth: 0
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+          <span style={{ fontSize: '11px', color: 'var(--dsw-alias-label-tertiary, #686872)' }}>
+            {syncing ? '同步 tasks.json...' : '已同步计划'}
+          </span>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: 700,
+            color: '#ef4444',
+            background: 'rgba(239, 68, 68, 0.12)',
+            border: '1px solid rgba(239, 68, 68, 0.25)',
+            padding: '2px 8px',
+            borderRadius: '12px'
           }}>
-            <span style={{
-              fontSize: '10px',
-              fontWeight: 700,
-              color: 'var(--dsw-alias-state-warn-primary, #eab308)',
-              background: 'rgba(234, 179, 8, 0.12)',
-              padding: '1px 5px',
-              borderRadius: '3px',
-              whiteSpace: 'nowrap',
-              flexShrink: 0
-            }}>
-              今日聚焦
-            </span>
-            <span style={{ fontSize: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {focusTask.title}
-            </span>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--dsw-alias-label-tertiary, #686872)' }}>
-            <span style={{
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
-              background: syncing ? 'var(--dsw-alias-brand-primary, #4d6bfe)' : 'var(--dsw-alias-state-success-primary, #10b981)'
-            }} />
-            <span>{syncing ? '同步中...' : '已同步 tasks.json'}</span>
-          </div>
-
-          <button
-            onClick={() => setModalCol('todo')}
-            style={{
-              height: '26px',
-              padding: '0 10px',
-              fontSize: '12px',
-              fontWeight: 600,
-              color: '#fff',
-              background: 'var(--dsw-alias-button-info-fill, #3b5bfd)',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
-          >
-            + 任务
-          </button>
+            距笔试约 68 天
+          </span>
         </div>
-      </header>
+      </div>
 
-      {/* 4 列任务泳道区 */}
+      {/* 专属作答/背诵限时计时器 (核心交互：点击任务开始计时，结束自动勾选完成) */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: `repeat(${data.columns.length}, 1fr)`,
-        gap: '10px',
-        flex: 1,
-        minHeight: 0
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '10px 16px',
+        background: activeTimerTask ? 'linear-gradient(135deg, #1c2333 0%, #151a24 100%)' : 'var(--dsw-alias-bg-layer-2, #212124)',
+        border: `1px solid ${activeTimerTask ? 'var(--dsw-alias-brand-primary, #4d6bfe)' : 'var(--dsw-alias-border-l2, rgba(255,255,255,0.1))'}`,
+        borderRadius: '8px',
+        boxShadow: activeTimerTask ? '0 0 12px rgba(59, 130, 246, 0.25)' : 'none',
+        transition: 'all 200ms ease',
+        flexShrink: 0
       }}>
-        {data.columns.map(col => {
-          const colTasks = data.tasks.filter(t => t.columnId === col.id)
-          return (
-            <div key={col.id} style={{
-              display: 'flex',
-              flexDirection: 'column',
-              background: 'var(--dsw-alias-bg-layer-1, #1a1a1c)',
-              border: '1px solid var(--dsw-alias-border-l1, rgba(255,255,255,0.06))',
-              borderRadius: '8px',
-              minHeight: 0,
-              overflow: 'hidden'
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+          <span style={{ fontSize: '18px' }}>⏱</span>
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--dsw-alias-label-secondary, #a0a0a8)' }}>
+              {activeTimerTask ? `正在专注限时执行 · ${activeTimerTask.module}` : '点击下方任意任务项旁的 [⏱ 开始专注] 载入计时'}
+            </div>
+            <div style={{ fontSize: '13.5px', fontWeight: 600, color: activeTimerTask ? '#60a5fa' : '#f0f0f2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {activeTimerTask ? activeTimerTask.title : '未启动计时器（计时结束后将自动标记该项完成）'}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
+          {activeTimerTask && (
+            <div style={{
+              fontSize: '24px',
+              fontFamily: 'ui-monospace, monospace',
+              fontWeight: 700,
+              color: secondsRemaining <= 300 ? '#ef4444' : '#38bdf8',
+              letterSpacing: '1px'
             }}>
-              <div style={{
+              {formatTime(secondsRemaining)}
+            </div>
+          )}
+
+          {activeTimerTask && (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setIsTimerRunning(prev => !prev)}
+                style={{
+                  height: '28px',
+                  padding: '0 12px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#fff',
+                  background: isTimerRunning ? '#eab308' : 'var(--dsw-alias-button-info-fill, #3b5bfd)',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer'
+                }}
+              >
+                {isTimerRunning ? '暂停' : '继续'}
+              </button>
+              <button
+                onClick={handleFinishTimerEarly}
+                style={{
+                  height: '28px',
+                  padding: '0 12px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#10b981',
+                  background: 'rgba(16, 185, 129, 0.12)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  borderRadius: '5px',
+                  cursor: 'pointer'
+                }}
+              >
+                提前交卷/完成 ✔
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 周一至周日固定计划切换 Tab */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, marginTop: '2px' }}>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {Object.entries(WEEK_NAMES).map(([key, label]) => {
+            const isCur = key === activeDay
+            const countDone = (data.weeklySchedule[key] || []).filter(t => t.done).length
+            const countAll = (data.weeklySchedule[key] || []).length
+            return (
+              <button
+                key={key}
+                onClick={() => setActiveDay(key)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  height: '28px',
+                  padding: '0 12px',
+                  fontSize: '12px',
+                  fontWeight: isCur ? 700 : 500,
+                  color: isCur ? '#f0f0f2' : 'var(--dsw-alias-label-secondary, #a0a0a8)',
+                  background: isCur ? 'var(--dsw-alias-bg-layer-2, #212124)' : 'transparent',
+                  border: `1px solid ${isCur ? 'var(--dsw-alias-border-l3, rgba(255,255,255,0.16))' : 'transparent'}`,
+                  borderRadius: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                <span>{label}</span>
+                {countAll > 0 && (
+                  <span style={{ fontSize: '10.5px', color: countDone === countAll ? '#10b981' : 'var(--dsw-alias-label-tertiary, #686872)' }}>
+                    {countDone}/{countAll}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--dsw-alias-label-secondary, #a0a0a8)' }}>
+          <span>今日进度:</span>
+          <div style={{ width: '80px', height: '5px', background: 'var(--dsw-alias-bg-layer-3, #2a2a2e)', borderRadius: '3px', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${dayProgressPct}%`, background: '#10b981', transition: 'width 200ms' }} />
+          </div>
+          <span style={{ fontWeight: 600, color: '#10b981' }}>{completedCount} / {totalCount} ({dayProgressPct}%)</span>
+        </div>
+      </div>
+
+      {/* 固定计划清单执行列表 (单行紧凑，完成一项勾选一项) */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '6px',
+        flex: 1,
+        minHeight: 0,
+        overflowY: 'auto'
+      }}>
+        {dayTasks.map(item => {
+          const isItemActiveTimer = activeTimerTask?.id === item.id
+          return (
+            <div
+              key={item.id}
+              style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '8px 10px',
-                borderBottom: '1px solid var(--dsw-alias-border-l1, rgba(255,255,255,0.06))',
-                flexShrink: 0
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{
-                    width: '7px',
-                    height: '7px',
-                    borderRadius: '50%',
-                    background:
-                      col.id === 'done' ? 'var(--dsw-alias-state-success-primary, #10b981)' :
-                      col.id === 'in_progress' ? 'var(--dsw-alias-state-warn-primary, #eab308)' :
-                      col.id === 'todo' ? 'var(--dsw-alias-state-business-primary, #3b82f6)' :
-                      'var(--dsw-alias-label-tertiary, #686872)'
-                  }} />
-                  <span style={{ fontSize: '12.5px', fontWeight: 600 }}>{col.title}</span>
-                  <span style={{
-                    fontSize: '11px',
-                    padding: '0 6px',
-                    borderRadius: '999px',
-                    background: 'var(--dsw-alias-interactive-bg-hover, rgba(255,255,255,0.05))',
-                    color: 'var(--dsw-alias-label-secondary, #a0a0a8)'
-                  }}>
-                    {colTasks.length}
+                padding: '9px 12px',
+                background: item.done ? 'rgba(255, 255, 255, 0.02)' : isItemActiveTimer ? 'rgba(59, 130, 246, 0.08)' : 'var(--dsw-alias-bg-layer-1, #1a1a1c)',
+                border: `1px solid ${isItemActiveTimer ? 'var(--dsw-alias-brand-primary, #4d6bfe)' : item.done ? 'var(--dsw-alias-border-l1, rgba(255,255,255,0.04))' : 'var(--dsw-alias-border-l2, rgba(255,255,255,0.08))'}`,
+                borderRadius: '6px',
+                gap: '12px',
+                transition: 'all 120ms ease'
+              }}
+            >
+              {/* 左侧勾选与标题 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={item.done}
+                  onChange={e => handleToggleDone(item.id, e.target.checked)}
+                  style={{ width: '15px', height: '15px', accentColor: '#10b981', cursor: 'pointer' }}
+                />
+
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: item.module.includes('申论') ? '#a78bfa' : item.module.includes('资料') ? '#38bdf8' : item.module.includes('数量') ? '#fbbf24' : '#94a3b8',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {item.timeSlot} · {item.module}
+                </span>
+
+                <span style={{
+                  fontSize: '12.5px',
+                  fontWeight: 500,
+                  color: item.done ? 'var(--dsw-alias-label-secondary, #a0a0a8)' : 'var(--dsw-alias-label-primary, #f0f0f2)',
+                  textDecoration: item.done ? 'line-through' : 'none',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {item.title}
+                </span>
+
+                {item.resource && (
+                  <span style={{ fontSize: '11px', color: 'var(--dsw-alias-label-tertiary, #686872)', whiteSpace: 'nowrap' }}>
+                    🔗 {item.resource}
                   </span>
-                </div>
-                <button
-                  onClick={() => setModalCol(col.id)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--dsw-alias-label-tertiary, #686872)',
-                    fontSize: '14px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  +
-                </button>
+                )}
               </div>
 
-              {/* 卡片列表 */}
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                padding: '8px',
-                overflowY: 'auto',
-                flex: 1,
-                minHeight: 0
-              }}>
-                {colTasks.map(t => {
-                  const isDone = t.columnId === 'done'
-                  return (
-                    <div key={t.id} style={{
-                      background: 'var(--dsw-alias-bg-base, #151517)',
-                      border: `1px solid ${t.id === data.plan.focusTaskId ? 'var(--dsw-alias-brand-primary, #4d6bfe)' : 'var(--dsw-alias-border-l2, rgba(255,255,255,0.1))'}`,
-                      borderRadius: '7px',
-                      padding: '9px 10px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '6px',
-                      opacity: isDone ? 0.6 : 1
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', flex: 1, minWidth: 0 }}>
-                          <input
-                            type="checkbox"
-                            checked={isDone}
-                            onChange={() => handleToggleCheck(t.id, isDone)}
-                            style={{ marginTop: '2px', cursor: 'pointer', accentColor: 'var(--dsw-alias-state-success-primary, #10b981)' }}
-                          />
-                          <span style={{
-                            fontSize: '12.5px',
-                            fontWeight: 500,
-                            lineHeight: 1.4,
-                            textDecoration: isDone ? 'line-through' : 'none',
-                            color: isDone ? 'var(--dsw-alias-label-secondary, #a0a0a8)' : 'var(--dsw-alias-label-primary, #f0f0f2)'
-                          }}>
-                            {t.title}
-                          </span>
-                        </div>
-                        <span style={{
-                          fontSize: '10px',
-                          fontWeight: 600,
-                          padding: '0 4px',
-                          borderRadius: '3px',
-                          flexShrink: 0,
-                          color: t.priority === 'P0' ? 'var(--dsw-alias-state-error-primary, #ef4444)' : t.priority === 'P1' ? 'var(--dsw-alias-state-warn-primary, #eab308)' : 'var(--dsw-alias-label-secondary, #a0a0a8)',
-                          background: t.priority === 'P0' ? 'rgba(239, 68, 68, 0.12)' : t.priority === 'P1' ? 'rgba(234, 179, 8, 0.12)' : 'rgba(255, 255, 255, 0.06)'
-                        }}>
-                          {t.priority}
-                        </span>
-                      </div>
+              {/* 右侧限时目标与计时交互 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                {item.done ? (
+                  <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 600 }}>
+                    ✔ 已完成 {item.actualMinutes ? `(用时 ${item.actualMinutes}m)` : ''}
+                  </span>
+                ) : (
+                  <>
+                    <span style={{ fontSize: '11.5px', color: 'var(--dsw-alias-label-secondary, #a0a0a8)' }}>
+                      限时 {item.targetMinutes} 分钟
+                    </span>
 
-                      {t.desc && (
-                        <div style={{ fontSize: '11.5px', color: 'var(--dsw-alias-label-secondary, #a0a0a8)', marginLeft: '18px', lineHeight: 1.45 }}>
-                          {t.desc}
-                        </div>
-                      )}
-
-                      {t.tags && t.tags.length > 0 && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginLeft: '18px' }}>
-                          {t.tags.map(tag => (
-                            <span key={tag} style={{
-                              fontSize: '10px',
-                              color: 'var(--dsw-alias-label-secondary, #a0a0a8)',
-                              background: 'var(--dsw-alias-bg-layer-2, #212124)',
-                              border: '1px solid var(--dsw-alias-border-l1, rgba(255,255,255,0.06))',
-                              padding: '0 4px',
-                              borderRadius: '3px'
-                            }}>
-                              {tag.startsWith('#') ? tag : `#${tag}`}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      <div style={{
-                        display: 'flex',
+                    <button
+                      onClick={() => handleStartTaskTimer(item)}
+                      style={{
+                        display: 'inline-flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
-                        fontSize: '10.5px',
-                        color: 'var(--dsw-alias-label-tertiary, #686872)',
-                        paddingTop: '4px',
-                        borderTop: '1px solid var(--dsw-alias-border-l1, rgba(255,255,255,0.06))',
-                        marginLeft: '18px'
-                      }}>
-                        <span>{t.source === 'ai' ? '✨ AI' : '👤 人工'}</span>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          {col.id !== 'todo' && <button onClick={() => handleMoveTask(t.id, 'todo')} style={{ background: 'transparent', border: 'none', color: 'var(--dsw-alias-label-secondary)', cursor: 'pointer', fontSize: '10.5px' }}>待办</button>}
-                          {col.id !== 'in_progress' && <button onClick={() => handleMoveTask(t.id, 'in_progress')} style={{ background: 'transparent', border: 'none', color: 'var(--dsw-alias-label-secondary)', cursor: 'pointer', fontSize: '10.5px' }}>推进</button>}
-                          {col.id !== 'done' && <button onClick={() => handleMoveTask(t.id, 'done')} style={{ background: 'transparent', border: 'none', color: 'var(--dsw-alias-label-secondary)', cursor: 'pointer', fontSize: '10.5px' }}>完成</button>}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
+                        gap: '4px',
+                        height: '24px',
+                        padding: '0 8px',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        color: isItemActiveTimer ? '#eab308' : '#38bdf8',
+                        background: isItemActiveTimer ? 'rgba(234, 179, 8, 0.12)' : 'rgba(56, 189, 248, 0.12)',
+                        border: `1px solid ${isItemActiveTimer ? 'rgba(234, 179, 8, 0.3)' : 'rgba(56, 189, 248, 0.25)'}`,
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {isItemActiveTimer && isTimerRunning ? '⏸ 计时中' : '⏱ 开始专注'}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )
         })}
       </div>
 
-      {/* 快速添加任务弹窗 */}
-      {modalCol && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            width: '400px',
-            background: 'var(--dsw-alias-bg-layer-1, #1a1a1c)',
-            border: '1px solid var(--dsw-alias-border-l3, rgba(255,255,255,0.16))',
-            borderRadius: '8px',
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px'
-          }}>
-            <div style={{ fontSize: '14px', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
-              <span>添加任务</span>
-              <span style={{ cursor: 'pointer', color: 'var(--dsw-alias-label-tertiary)' }} onClick={() => setModalCol(null)}>✕</span>
-            </div>
-
-            <input
-              type="text"
-              value={newTitle}
-              onChange={e => setNewTitle(e.target.value)}
-              placeholder="任务名称..."
-              style={{
-                background: 'var(--dsw-alias-bg-base, #151517)',
-                border: '1px solid var(--dsw-alias-border-l2, rgba(255,255,255,0.1))',
-                borderRadius: '5px',
-                padding: '6px 8px',
-                color: '#fff',
-                fontSize: '12.5px',
-                outline: 'none'
-              }}
-            />
-
-            <input
-              type="text"
-              value={newDesc}
-              onChange={e => setNewDesc(e.target.value)}
-              placeholder="要点或补充说明..."
-              style={{
-                background: 'var(--dsw-alias-bg-base, #151517)',
-                border: '1px solid var(--dsw-alias-border-l2, rgba(255,255,255,0.1))',
-                borderRadius: '5px',
-                padding: '6px 8px',
-                color: '#fff',
-                fontSize: '12px',
-                outline: 'none'
-              }}
-            />
-
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <select
-                value={newPriority}
-                onChange={e => setNewPriority(e.target.value as any)}
-                style={{
-                  flex: 1,
-                  background: 'var(--dsw-alias-bg-base, #151517)',
-                  border: '1px solid var(--dsw-alias-border-l2, rgba(255,255,255,0.1))',
-                  borderRadius: '5px',
-                  padding: '5px',
-                  color: '#fff',
-                  fontSize: '12px'
-                }}
-              >
-                <option value="P0">P0 (最高)</option>
-                <option value="P1">P1 (重要)</option>
-                <option value="P2">P2 (普通)</option>
-              </select>
-              <input
-                type="text"
-                value={newTags}
-                onChange={e => setNewTags(e.target.value)}
-                placeholder="标签以空格分隔"
-                style={{
-                  flex: 2,
-                  background: 'var(--dsw-alias-bg-base, #151517)',
-                  border: '1px solid var(--dsw-alias-border-l2, rgba(255,255,255,0.1))',
-                  borderRadius: '5px',
-                  padding: '5px 8px',
-                  color: '#fff',
-                  fontSize: '12px',
-                  outline: 'none'
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
-              <button
-                onClick={() => setModalCol(null)}
-                style={{
-                  padding: '4px 10px',
-                  background: 'transparent',
-                  border: '1px solid var(--dsw-alias-border-l2)',
-                  color: 'var(--dsw-alias-label-secondary)',
-                  borderRadius: '5px',
-                  cursor: 'pointer'
-                }}
-              >
-                取消
-              </button>
-              <button
-                onClick={handleCreateTask}
-                style={{
-                  padding: '4px 12px',
-                  background: 'var(--dsw-alias-button-info-fill)',
-                  border: 'none',
-                  color: '#fff',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontWeight: 600
-                }}
-              >
-                保存
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 底部三个关键战略检查点提示 */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '6px 12px',
+        background: 'rgba(255, 255, 255, 0.02)',
+        borderTop: '1px solid var(--dsw-alias-border-l1, rgba(255,255,255,0.06))',
+        fontSize: '11px',
+        color: 'var(--dsw-alias-label-tertiary, #686872)',
+        flexShrink: 0
+      }}>
+        <span style={{ fontWeight: 700, color: 'var(--dsw-alias-label-secondary, #a0a0a8)' }}>关键检查点:</span>
+        {data.checkpoints.map((cp, idx) => (
+          <span key={idx}>
+            <b style={{ color: '#94a3b8' }}>{cp.date}</b>: {cp.criteria}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }

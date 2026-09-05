@@ -1,17 +1,17 @@
 {
   "plan": {
-    "target": "工作区通用目标推进",
-    "currentStage": "阶段一：任务初始化与重点排期",
-    "focusTaskId": "task-g-01"
+    "target": "申论系统性备考与题型突破全景计划",
+    "currentStage": "阶段一：单一题型要素归纳与审题切口精训",
+    "focusTaskId": "plan-task-02"
   },
   "columns": [
     {
       "id": "backlog",
-      "title": "需求池"
+      "title": "计划备选"
     },
     {
       "id": "todo",
-      "title": "待处理"
+      "title": "今日待办"
     },
     {
       "id": "in_progress",
@@ -19,52 +19,87 @@
     },
     {
       "id": "done",
-      "title": "已交付"
+      "title": "已完成"
     }
   ],
   "tasks": [
     {
-      "id": "task-1788608861625",
-      "columnId": "backlog",
-      "title": "1",
-      "priority": "P1",
-      "source": "manual",
-      "createdAt": "2026-09-05T11:47:41.625Z"
-    },
-    {
-      "id": "task-1788608855015",
-      "columnId": "in_progress",
-      "title": "111",
-      "desc": "test",
-      "priority": "P1",
-      "source": "manual",
-      "createdAt": "2026-09-05T11:47:35.015Z"
-    },
-    {
-      "id": "task-g-01",
-      "columnId": "done",
-      "title": "梳理项目架构与核心模块划分",
-      "desc": "明确数据持久化契约，确保前后端与工作区协议规范一致。",
+      "id": "plan-task-01",
+      "columnId": "todo",
+      "title": "概括归纳题：2023行政执法卷第一题要素精炼",
+      "desc": "提炼'刚柔相济执法规范化'的三个抓手，严格压缩至150字，注意动宾搭配。",
       "priority": "P0",
       "tags": [
-        "架构",
-        "规划"
-      ],
-      "source": "manual",
-      "createdAt": "2026-09-04T10:00:00Z"
-    },
-    {
-      "id": "task-g-02",
-      "columnId": "done",
-      "title": "编写最小可复现原型并完成自测",
-      "desc": "搭建测试数据流，验证人机协同双向读写准确性。",
-      "priority": "P1",
-      "tags": [
-        "开发",
-        "测试"
+        "要素归纳",
+        "真题精练"
       ],
       "source": "ai",
-      "createdAt": "2026-09-04T10:30:00Z"
+      "createdAt": "2026-09-05T12:00:00.000Z"
+    },
+    {
+      "id": "plan-task-02",
+      "columnId": "todo",
+      "title": "大作文：论点框架搭建与分论点排布模型",
+      "desc": "按观念筑基、制度立柱、民生落脚三个递进维度拟定对仗小标题，梳理首尾段论述。",
+      "priority": "P0",
+      "tags": [
+        "大作文",
+        "论证框架"
+      ],
+      "source": "ai",
+      "createdAt": "2026-09-05T12:05:00.000Z"
+    },
+    {
+      "id": "plan-task-03",
+      "columnId": "in_progress",
+      "title": "对策建议题：主体/措施/保障三要素有效性排查",
+      "desc": "建立对策题落地检验清单，重点规避'假大空、措施不可操作'手癖。",
+      "priority": "P1",
+      "tags": [
+        "提出对策",
+        "答题规范"
+      ],
+      "source": "ai",
+      "createdAt": "2026-09-05T12:10:00.000Z"
+    },
+    {
+      "id": "plan-task-04",
+      "columnId": "backlog",
+      "title": "综合分析题：'评析型'词句理解正反论据推演",
+      "desc": "梳理'是什么-为什么-怎么办'论述闭环，重点训练辩证分析视角。",
+      "priority": "P1",
+      "tags": [
+        "综合分析",
+        "逻辑推演"
+      ],
+      "source": "ai",
+      "createdAt": "2026-09-05T12:15:00.000Z"
+    },
+    {
+      "id": "plan-task-05",
+      "columnId": "backlog",
+      "title": "政策理论与时政金句分类词库整理",
+      "desc": "建立基层治理与新质生产力专项语料库，形成规范写作表达库。",
+      "priority": "P2",
+      "tags": [
+        "时政热点",
+        "素材沉淀"
+      ],
+      "source": "ai",
+      "createdAt": "2026-09-05T12:20:00.000Z"
+    },
+    {
+      "id": "plan-task-06",
+      "columnId": "done",
+      "title": "公文写作格式规范自检清单建立",
+      "desc": "涵盖通知、倡议书、调研报告的标题、称谓、正文逻辑与落款规范。",
+      "priority": "P1",
+      "tags": [
+        "贯彻执行",
+        "格式自检"
+      ],
+      "source": "ai",
+      "createdAt": "2026-09-05T11:50:00.000Z"
     }
   ]
 }
