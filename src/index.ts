@@ -20,12 +20,12 @@ export function apply(ctx: Context) {
   // 注册 HTTP API 服务供前端 client 调用
   ctx.effect(() => {
     return ctx.webServer.register({
-      name: 'dsh-workspace-canvas-api',
-      path: '/api/workspace-canvas/:action',
+      kind: 'prefix',
+      path: '/api/workspace-canvas',
       handler: async (req, res) => {
         const url = new URL(req.url ?? '/', `http://${req.headers.host || 'localhost'}`)
         const pathname = url.pathname
-        const action = pathname.split('/').pop()
+        const action = pathname.replace(/^\/api\/workspace-canvas\/?/, '')
 
         // 统一响应辅助函数
         const sendJson = (status: number, data: any) => {
