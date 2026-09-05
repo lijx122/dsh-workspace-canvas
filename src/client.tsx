@@ -4,8 +4,9 @@ import { TaskView, type TasksData } from './TaskView'
 
 export const inject = ['slots']
 
-const VIEW_ID = 'dsh-task-canvas'
-const STORAGE_KEY_PREFIX = 'dsh.workspace.pinned_views:'
+const VIEW_ID_TASK = 'dsh-task-canvas'
+const VIEW_ID_DESIGN = 'ipollowork-design-studio'
+const VIEW_ID_VIDEO = 'ipollowork-video-studio'
 
 export function apply(ctx: Context) {
   // 1. 向 DSH 原生 conversation.view 插槽注入 Task 视图
@@ -13,7 +14,7 @@ export function apply(ctx: Context) {
     ctx.slots.register(
       {
         name: 'conversation.view',
-        id: VIEW_ID,
+        id: VIEW_ID_TASK,
         order: 15,
         label: 'Task'
       },
@@ -21,7 +22,7 @@ export function apply(ctx: Context) {
     )
   )
 
-  // 2. 挂载全局按需常驻加号 (+) 菜单管理器
+  // 2. 挂载全局按需常驻加号 (+) 菜单管理器 (统一收纳 Task, Design, Video)
   setupDynamicViewManager()
 }
 
@@ -78,11 +79,10 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions }: { sessionI
     })
   }
 
-  // 桥接向 AI 发送复盘指令
+  // 桥接向 AI 发送复盘指令并切回对话
   const handleSendToAi = (prompt: string) => {
     if (inputActions && typeof inputActions.setDraft === 'function') {
       inputActions.setDraft(prompt)
-      // 自动切换回 [对话] tab，方便用户直接查看 AI 思考和回答
       const chatTab = document.querySelector('button[role="tab"]') as HTMLButtonElement
       if (chatTab) chatTab.click()
     } else {
@@ -145,10 +145,10 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions }: { sessionI
 }
 
 /**
- * 顶部 Tab 栏动态管理器：
- * 1. 在 [role="tablist"] 右侧注入 [+] 加号按钮与管理浮层
- * 2. 默认在工作区不常驻 Task 按钮，只有点击 [+] 选择开启「任务看板 (Task)」后才常驻
- * 3. 支持随时取消常驻，状态按当前工作区持久化到 localStorage
+ * 顶部 Tab 栏统一动态管理器：
+ * 1. 默认收纳 [Task]、[Design]、[Video]，避免无用时占据顶部空间
+ * 2. 在 [role="tablist"] 右侧注入 [+] 加号按钮与浮层菜单
+ * 3. 用户在 [+] 菜单中按需勾选常驻哪项，哪项就显示在顶部，并支持一键取消常驻
  */
 function setupDynamicViewManager() {
   if (typeof document === 'undefined') return
@@ -157,8 +157,14 @@ function setupDynamicViewManager() {
   const styleEl = document.createElement('style')
   styleEl.id = 'dsh-workspace-canvas-manager-styles'
   styleEl.textContent = `
-    /* 默认隐藏 Task 按钮，只有当当前工作区已启用时显示 */
-    body:not([data-dsh-has-task="true"]) button[role="tab"]:is([data-view-id="dsh-task-canvas"]) {
+    /* 默认隐藏未勾选常驻的扩展视图，仅在对应开关为 true 时展示 */
+    body:not([data-dsh-show-task="true"]) button[role="tab"][data-view-kind="task"] {
+      display: none !important;
+    }
+    body:not([data-dsh-show-design="true"]) button[role="tab"][data-view-kind="design"] {
+      display: none !important;
+    }
+    body:not([data-dsh-show-video="true"]) button[role="tab"][data-view-kind="video"] {
       display: none !important;
     }
 
@@ -191,7 +197,7 @@ function setupDynamicViewManager() {
       top: 100%;
       right: 0;
       margin-top: 6px;
-      width: 190px;
+      width: 196px;
       background: var(--dsw-alias-bg-layer-2, #212124);
       border: 1px solid var(--dsw-alias-border-l3, rgba(255, 255, 255, 0.16));
       border-radius: 8px;
@@ -203,6 +209,14 @@ function setupDynamicViewManager() {
       gap: 2px;
       font-size: 12.5px;
       color: var(--dsw-alias-label-primary, #f0f0f2);
+    }
+    .dsh-view-menu-header {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--dsw-alias-label-tertiary, #686872);
+      padding: 4px 8px;
+      border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, 0.06));
+      margin-bottom: 4px;
     }
     .dsh-view-menu-item {
       display: flex;
@@ -220,37 +234,46 @@ function setupDynamicViewManager() {
     .dsh-view-menu-check {
       color: var(--dsw-alias-brand-primary, #4d6bfe);
       font-weight: bold;
+      font-size: 13px;
     }
   `
   document.head.appendChild(styleEl)
 
-  // 轮询与观察 DOM，在 [role="tablist"] 内挂载 [+] 按钮并标记按钮属性
+  // 同步 Tab 栏标识与显隐属性
   const syncTabBar = () => {
     const tablist = document.querySelector('[role="tablist"]')
     if (!tablist) return
 
-    // 为每个 tab 打上 data-view-id 方便选择器识别
+    // 标记各 tab 的类型
     const tabs = tablist.querySelectorAll('button[role="tab"]')
     tabs.forEach(tab => {
       const text = tab.textContent?.trim()
       if (text === 'Task') {
-        tab.setAttribute('data-view-id', VIEW_ID)
+        tab.setAttribute('data-view-kind', 'task')
+      } else if (text === 'Design') {
+        tab.setAttribute('data-view-kind', 'design')
+      } else if (text === 'Video') {
+        tab.setAttribute('data-view-kind', 'video')
       }
     })
 
-    // 读取当前工作区是否有开启 task
-    const isTaskEnabled = localStorage.getItem('dsh.canvas.task_pinned') === 'true'
-    document.body.setAttribute('data-dsh-has-task', isTaskEnabled ? 'true' : 'false')
+    // 读取开关状态
+    const showTask = localStorage.getItem('dsh.canvas.show_task') === 'true'
+    const showDesign = localStorage.getItem('dsh.canvas.show_design') === 'true'
+    const showVideo = localStorage.getItem('dsh.canvas.show_video') === 'true'
+
+    document.body.setAttribute('data-dsh-show-task', showTask ? 'true' : 'false')
+    document.body.setAttribute('data-dsh-show-design', showDesign ? 'true' : 'false')
+    document.body.setAttribute('data-dsh-show-video', showVideo ? 'true' : 'false')
 
     // 注入 [+] 按钮（若尚未注入）
     if (!tablist.querySelector('.dsh-view-add-btn')) {
       const addBtn = document.createElement('button')
       addBtn.className = 'dsh-view-add-btn'
-      addBtn.title = '管理当前会话常驻视图 (Task 看板等)'
+      addBtn.title = '管理常驻视图 (Task / Design / Video)'
       addBtn.textContent = '+'
       addBtn.type = 'button'
 
-      // 菜单状态与浮层
       let menuEl: HTMLDivElement | null = null
 
       const closeMenu = () => {
@@ -267,39 +290,54 @@ function setupDynamicViewManager() {
           return
         }
 
-        const currentPinned = localStorage.getItem('dsh.canvas.task_pinned') === 'true'
+        const curTask = localStorage.getItem('dsh.canvas.show_task') === 'true'
+        const curDesign = localStorage.getItem('dsh.canvas.show_design') === 'true'
+        const curVideo = localStorage.getItem('dsh.canvas.show_video') === 'true'
 
         menuEl = document.createElement('div')
         menuEl.className = 'dsh-view-menu-popover'
         menuEl.innerHTML = `
-          <div style="font-size: 11px; color: var(--dsw-alias-label-tertiary, #686872); padding: 4px 8px; border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(255,255,255,0.06)); margin-bottom: 4px;">
-            会话视图管理
+          <div class="dsh-view-menu-header">按需常驻扩展视图</div>
+          <div class="dsh-view-menu-item" id="itemToggleTask">
+            <span>📋 任务看板 (Task)</span>
+            <span class="dsh-view-menu-check">${curTask ? '✔' : ''}</span>
           </div>
-          <div class="dsh-view-menu-item" id="menuToggleTask">
-            <span>任务看板 (Task)</span>
-            <span class="dsh-view-menu-check">${currentPinned ? '✔' : ''}</span>
+          <div class="dsh-view-menu-item" id="itemToggleDesign">
+            <span>🎨 设计工坊 (Design)</span>
+            <span class="dsh-view-menu-check">${curDesign ? '✔' : ''}</span>
+          </div>
+          <div class="dsh-view-menu-item" id="itemToggleVideo">
+            <span>🎬 视频制作 (Video)</span>
+            <span class="dsh-view-menu-check">${curVideo ? '✔' : ''}</span>
           </div>
         `
 
         menuEl.onclick = (ev) => ev.stopPropagation()
 
-        const toggleItem = menuEl.querySelector('#menuToggleTask') as HTMLElement
-        if (toggleItem) {
-          toggleItem.onclick = () => {
-            const next = !currentPinned
-            localStorage.setItem('dsh.canvas.task_pinned', next ? 'true' : 'false')
-            document.body.setAttribute('data-dsh-has-task', next ? 'true' : 'false')
-            closeMenu()
+        // 点击切换开关
+        const bindToggle = (id: string, storageKey: string, bodyAttr: string, kind: string, current: boolean) => {
+          const item = menuEl?.querySelector(id) as HTMLElement | null
+          if (item) {
+            item.onclick = () => {
+              const next = !current
+              localStorage.setItem(storageKey, next ? 'true' : 'false')
+              document.body.setAttribute(bodyAttr, next ? 'true' : 'false')
+              closeMenu()
 
-            // 如果开启了常驻，且界面上有 Task tab，自动点击切换过去
-            if (next) {
-              const taskTab = tablist.querySelector('button[data-view-id="dsh-task-canvas"]') as HTMLButtonElement
-              if (taskTab) taskTab.click()
+              // 开启时自动切过去
+              if (next) {
+                const targetTab = tablist.querySelector(`button[data-view-kind="${kind}"]`) as HTMLButtonElement
+                if (targetTab) targetTab.click()
+              }
             }
           }
         }
 
-        // 挂载到父级相对定位容器
+        bindToggle('#itemToggleTask', 'dsh.canvas.show_task', 'data-dsh-show-task', 'task', curTask)
+        bindToggle('#itemToggleDesign', 'dsh.canvas.show_design', 'data-dsh-show-design', 'design', curDesign)
+        bindToggle('#itemToggleVideo', 'dsh.canvas.show_video', 'data-dsh-show-video', 'video', curVideo)
+
+        // 挂载到父容器
         const parent = tablist.parentElement || tablist
         if (getComputedStyle(parent).position === 'static') {
           (parent as HTMLElement).style.position = 'relative'
@@ -317,7 +355,6 @@ function setupDynamicViewManager() {
     }
   }
 
-  // 观察与防抖挂载
   const observer = new MutationObserver(() => syncTabBar())
   observer.observe(document.body, { childList: true, subtree: true })
   syncTabBar()
