@@ -28,13 +28,13 @@ export function apply(ctx: Context) {
 /**
  * 桥接组件：负责获取当前会话所在的 Workspace，读取状态并渲染 TaskView
  */
-function CanvasViewBridge({ sessionId, useWorkspaces }: { sessionId: string; useWorkspaces: any }) {
+function CanvasViewBridge({ sessionId, useWorkspaces, inputActions }: { sessionId: string; useWorkspaces: any; inputActions?: any }) {
   const workspace = useWorkspaces((state: any) =>
     state.items?.find((item: any) => item.sessionIds?.includes(sessionId))
   )
 
   const [loading, setLoading] = useState(true)
-  const [tasksData, setTasksData] = useState<TasksData | null>(null)
+  const [tasksData, setTasksData] = useState<any | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const workspaceId = workspace ? String(workspace.workspaceId) : ''
@@ -69,13 +69,26 @@ function CanvasViewBridge({ sessionId, useWorkspaces }: { sessionId: string; use
   }, [workspaceId, cwd])
 
   // 保存数据回工作区 tasks.json
-  const handleSave = async (updatedData: TasksData) => {
+  const handleSave = async (updatedData: any) => {
     setTasksData(updatedData)
     await fetch('/api/workspace-canvas/save-tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ workspaceId, cwd, tasksData: updatedData })
     })
+  }
+
+  // 桥接向 AI 发送复盘指令
+  const handleSendToAi = (prompt: string) => {
+    if (inputActions && typeof inputActions.setDraft === 'function') {
+      inputActions.setDraft(prompt)
+      // 自动切换回 [对话] tab，方便用户直接查看 AI 思考和回答
+      const chatTab = document.querySelector('button[role="tab"]') as HTMLButtonElement
+      if (chatTab) chatTab.click()
+    } else {
+      navigator.clipboard?.writeText(prompt)
+      alert('✨ 复盘诊断提问已自动复制到剪贴板！可直接粘贴到底部输入框发送给 AI。')
+    }
   }
 
   if (!workspace) {
@@ -126,6 +139,7 @@ function CanvasViewBridge({ sessionId, useWorkspaces }: { sessionId: string; use
       cwd={cwd}
       initialData={tasksData}
       onSave={handleSave}
+      onSendToAi={handleSendToAi}
     />
   )
 }

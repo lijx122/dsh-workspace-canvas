@@ -1,105 +1,232 @@
 {
-  "plan": {
-    "target": "申论系统性备考与题型突破全景计划",
-    "currentStage": "阶段一：单一题型要素归纳与审题切口精训",
-    "focusTaskId": "plan-task-02"
+  "profile": {
+    "target": "国考 135+ (行测 70 / 申论 65) · 湖南省考 150 冲刺",
+    "stage": "P1 系统攻坚期 (8.18 - 9.27)",
+    "currentWeek": "第 3 周",
+    "daysLeft": 68,
+    "coreRule": "小马哥真题必动笔限时手写 · 能分类加小标题，30秒分不出大类直接填满原词采分点"
   },
-  "columns": [
+  "weeklySchedule": {
+    "1": [
+      {
+        "id": "mon-1",
+        "timeSlot": "09:00-10:30",
+        "module": "数量关系",
+        "title": "刘文超数量关系系统课 (高频题型攻坚)",
+        "targetMinutes": 90,
+        "done": false,
+        "resource": "B站 BV1nE411o7qp"
+      },
+      {
+        "id": "mon-2",
+        "timeSlot": "14:00-15:00",
+        "module": "资料分析",
+        "title": "资料分析 1 套限时训练 (做完三分类复盘)",
+        "targetMinutes": 35,
+        "done": false,
+        "resource": "真题卷限时"
+      },
+      {
+        "id": "mon-3",
+        "timeSlot": "19:30-20:30",
+        "module": "言语理解",
+        "title": "言语理解真题刷题 35 题 (维持题感)",
+        "targetMinutes": 40,
+        "done": false,
+        "resource": "题库自测"
+      }
+    ],
+    "2": [
+      {
+        "id": "tue-1",
+        "timeSlot": "09:00-10:30",
+        "module": "申论系统",
+        "title": "小马哥申论系统课 (定位材料原词，拒套模版)",
+        "targetMinutes": 90,
+        "done": false,
+        "resource": "B站 BV1YM4y137h3"
+      },
+      {
+        "id": "tue-2",
+        "timeSlot": "14:00-15:00",
+        "module": "资料分析",
+        "title": "资料分析 1 套限时训练 (目标达标率≥80%)",
+        "targetMinutes": 35,
+        "done": false,
+        "resource": "真题卷限时"
+      },
+      {
+        "id": "tue-3",
+        "timeSlot": "19:30-21:30",
+        "module": "🔥申论动笔",
+        "title": "🔥 申论小题动笔手写限时练 (0.5mm黑笔规范占格80%)",
+        "targetMinutes": 60,
+        "done": false,
+        "resource": "真题答题纸"
+      }
+    ],
+    "3": [
+      {
+        "id": "wed-1",
+        "timeSlot": "09:00-10:30",
+        "module": "数量关系",
+        "title": "刘文超数量关系系统课 (保6-8类高频必拿分题)",
+        "targetMinutes": 90,
+        "done": false,
+        "resource": "B站 BV1nE411o7qp"
+      },
+      {
+        "id": "wed-2",
+        "timeSlot": "14:00-15:00",
+        "module": "资料分析",
+        "title": "资料分析 1 套限时训练 (陷阱/速算/公式查漏)",
+        "targetMinutes": 35,
+        "done": false,
+        "resource": "真题卷限时"
+      },
+      {
+        "id": "wed-3",
+        "timeSlot": "19:30-20:30",
+        "module": "判断推理",
+        "title": "判断推理刷题 40 题 (图形/定义/类比/逻辑维持)",
+        "targetMinutes": 45,
+        "done": false,
+        "resource": "题库自测"
+      }
+    ],
+    "4": [
+      {
+        "id": "thu-1",
+        "timeSlot": "09:00-10:30",
+        "module": "申论系统",
+        "title": "小马哥申论系统课 (第2道起暂停先手写后听讲解)",
+        "targetMinutes": 90,
+        "done": false,
+        "resource": "B站 BV1YM4y137h3"
+      },
+      {
+        "id": "thu-2",
+        "timeSlot": "14:00-15:00",
+        "module": "资料分析",
+        "title": "资料分析 1 套限时训练 (错题本归纳)",
+        "targetMinutes": 35,
+        "done": false,
+        "resource": "真题卷限时"
+      },
+      {
+        "id": "thu-3",
+        "timeSlot": "19:30-21:30",
+        "module": "🔥申论动笔",
+        "title": "🔥 申论大作文/对策题实战 (红笔标出遗漏采分词)",
+        "targetMinutes": 60,
+        "done": false,
+        "resource": "真题答题纸"
+      }
+    ],
+    "5": [
+      {
+        "id": "fri-1",
+        "timeSlot": "09:00-10:30",
+        "module": "政治理论",
+        "title": "李铁 26 国考政治理论专项课 (时政要点)",
+        "targetMinutes": 90,
+        "done": false,
+        "resource": "B站 BV1rys3zEE1P"
+      },
+      {
+        "id": "fri-2",
+        "timeSlot": "14:00-15:00",
+        "module": "资料分析",
+        "title": "资料分析 1 套限时训练 (冲刺 90%+ 正确率)",
+        "targetMinutes": 35,
+        "done": false,
+        "resource": "真题卷限时"
+      },
+      {
+        "id": "fri-3",
+        "timeSlot": "19:30-20:30",
+        "module": "数量专题",
+        "title": "数量关系专题精练 15 题 (工程/行程/经济利润)",
+        "targetMinutes": 45,
+        "done": false,
+        "resource": "专项题集"
+      }
+    ],
+    "6": [
+      {
+        "id": "sat-1",
+        "timeSlot": "09:00-10:30",
+        "module": "常识判断",
+        "title": "马克公基与常识系统课",
+        "targetMinutes": 90,
+        "done": true,
+        "resource": "B站 BV17K411N7hU"
+      },
+      {
+        "id": "sat-2",
+        "timeSlot": "14:00-15:00",
+        "module": "资料分析",
+        "title": "资料分析 1 套限时训练 (本周压轴测试)",
+        "targetMinutes": 35,
+        "done": true,
+        "resource": "真题卷限时"
+      },
+      {
+        "id": "sat-3",
+        "timeSlot": "19:30-20:30",
+        "module": "错题清零",
+        "title": "本周全科目错题本深度清零与复盘",
+        "targetMinutes": 60,
+        "done": true,
+        "resource": "个人错题本"
+      }
+    ],
+    "7": [
+      {
+        "id": "sun-1",
+        "timeSlot": "09:00-11:00",
+        "module": "全真模考",
+        "title": "行测 120 分钟全真闭卷模考",
+        "targetMinutes": 120,
+        "done": false,
+        "resource": "粉笔周模考",
+        "actualMinutes": 1
+      },
+      {
+        "id": "sun-2",
+        "timeSlot": "14:00-17:00",
+        "module": "申论模考",
+        "title": "申论 180 分钟全真模考 (或模考深度复盘解析)",
+        "targetMinutes": 180,
+        "done": false,
+        "resource": "B站 BV1qo3w6wEAN"
+      },
+      {
+        "id": "sun-3",
+        "timeSlot": "19:30-20:30",
+        "module": "周休整顿",
+        "title": "周度指标检验 (行测达标率 + 申论篇数统计) 与休整",
+        "targetMinutes": 30,
+        "done": false,
+        "resource": "备考手记"
+      }
+    ]
+  },
+  "checkpoints": [
     {
-      "id": "backlog",
-      "title": "计划备选"
+      "date": "9/27 (P1终期)",
+      "criteria": "模考行测 ≥65 分、申论累计实战动笔 ≥8 篇",
+      "action": "达标则进 P2 大题量阶段；否则砍数量保 5 类核心题"
     },
     {
-      "id": "todo",
-      "title": "今日待办"
+      "date": "10/31 (报名前)",
+      "criteria": "行测 ≥68 且申论 ≥60",
+      "action": "达标冲刺热门/优选岗；否则转长株潭外围/苏南县级优先上岸"
     },
     {
-      "id": "in_progress",
-      "title": "进行中"
-    },
-    {
-      "id": "done",
-      "title": "已完成"
-    }
-  ],
-  "tasks": [
-    {
-      "id": "plan-task-01",
-      "columnId": "todo",
-      "title": "概括归纳题：2023行政执法卷第一题要素精炼",
-      "desc": "提炼'刚柔相济执法规范化'的三个抓手，严格压缩至150字，注意动宾搭配。",
-      "priority": "P0",
-      "tags": [
-        "要素归纳",
-        "真题精练"
-      ],
-      "source": "ai",
-      "createdAt": "2026-09-05T12:00:00.000Z"
-    },
-    {
-      "id": "plan-task-02",
-      "columnId": "todo",
-      "title": "大作文：论点框架搭建与分论点排布模型",
-      "desc": "按观念筑基、制度立柱、民生落脚三个递进维度拟定对仗小标题，梳理首尾段论述。",
-      "priority": "P0",
-      "tags": [
-        "大作文",
-        "论证框架"
-      ],
-      "source": "ai",
-      "createdAt": "2026-09-05T12:05:00.000Z"
-    },
-    {
-      "id": "plan-task-03",
-      "columnId": "in_progress",
-      "title": "对策建议题：主体/措施/保障三要素有效性排查",
-      "desc": "建立对策题落地检验清单，重点规避'假大空、措施不可操作'手癖。",
-      "priority": "P1",
-      "tags": [
-        "提出对策",
-        "答题规范"
-      ],
-      "source": "ai",
-      "createdAt": "2026-09-05T12:10:00.000Z"
-    },
-    {
-      "id": "plan-task-04",
-      "columnId": "backlog",
-      "title": "综合分析题：'评析型'词句理解正反论据推演",
-      "desc": "梳理'是什么-为什么-怎么办'论述闭环，重点训练辩证分析视角。",
-      "priority": "P1",
-      "tags": [
-        "综合分析",
-        "逻辑推演"
-      ],
-      "source": "ai",
-      "createdAt": "2026-09-05T12:15:00.000Z"
-    },
-    {
-      "id": "plan-task-05",
-      "columnId": "backlog",
-      "title": "政策理论与时政金句分类词库整理",
-      "desc": "建立基层治理与新质生产力专项语料库，形成规范写作表达库。",
-      "priority": "P2",
-      "tags": [
-        "时政热点",
-        "素材沉淀"
-      ],
-      "source": "ai",
-      "createdAt": "2026-09-05T12:20:00.000Z"
-    },
-    {
-      "id": "plan-task-06",
-      "columnId": "done",
-      "title": "公文写作格式规范自检清单建立",
-      "desc": "涵盖通知、倡议书、调研报告的标题、称谓、正文逻辑与落款规范。",
-      "priority": "P1",
-      "tags": [
-        "贯彻执行",
-        "格式自检"
-      ],
-      "source": "ai",
-      "createdAt": "2026-09-05T11:50:00.000Z"
+      "date": "11/20 (冲刺期)",
+      "criteria": "时政完成 2 轮背诵、申论累计写满 ≥20 篇",
+      "action": "全真套卷闭卷模拟考场生物钟"
     }
   ]
 }
