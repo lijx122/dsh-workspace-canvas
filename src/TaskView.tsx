@@ -414,13 +414,16 @@ export function TaskView({
       flexDirection: 'column',
       height: '100%',
       width: '100%',
+      maxWidth: '100%',
+      boxSizing: 'border-box',
       background: 'var(--dsw-alias-bg-base, #151517)',
-      padding: '12px 18px',
-      gap: '10px',
+      padding: '12px 28px 16px 20px',
+      gap: '12px',
       color: 'var(--dsw-alias-label-primary, #f0f0f2)',
       fontFamily: 'var(--dsw-font-family, sans-serif)',
       fontSize: '13px',
       userSelect: 'none',
+      overflowX: 'hidden',
       overflowY: 'auto'
     }}>
       {/* 顶部操作条与指标 */}
@@ -558,12 +561,14 @@ export function TaskView({
       {/* 核心看板泳道（自适应列数：标准五列或自定义列） */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: `repeat(${data.columns.length}, minmax(210px, 1fr))`,
+        gridTemplateColumns: `repeat(${data.columns.length}, minmax(190px, 1fr))`,
         gap: '10px',
         flex: 1,
         minHeight: 0,
+        boxSizing: 'border-box',
         overflowX: 'auto',
-        overflowY: 'hidden'
+        overflowY: 'hidden',
+        paddingBottom: '4px'
       }}>
         {data.columns.map(col => {
           const colTasks = data.tasks.filter(t => t.columnId === col.id)

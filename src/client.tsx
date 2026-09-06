@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
-import { TaskView, type TasksData } from './TaskView'
+import { TaskView, type CanvasBoardData } from './TaskView'
 
 export const inject = ['slots', 'sessions', 'workspaces']
 
@@ -160,7 +160,7 @@ function getCurrentWorkspaceScope(ctx?: Context): string {
       }
     }
   } catch (e) {
-    // 降级使用页面 DOM 面包屑或 default
+    // 降级使用 default
   }
   return 'default'
 }
@@ -169,6 +169,7 @@ function getCurrentWorkspaceScope(ctx?: Context): string {
  * 顶部 Tab 栏统一动态管理器：
  * 1. 修复同行排版：严格对齐 DSH 原生 .tab 样式与尺寸，禁止换行
  * 2. 工作区独立隔离：每个工作区的视图常驻状态（Task / Design / Video）彼此完全隔离
+ * 3. 约束外层容器边距与滚动，彻底避免右侧漏出显示器外延
  */
 function setupDynamicViewManager(ctx: Context) {
   if (typeof document === 'undefined') return
@@ -176,6 +177,14 @@ function setupDynamicViewManager(ctx: Context) {
   const styleEl = document.createElement('style')
   styleEl.id = 'dsh-workspace-canvas-manager-styles'
   styleEl.textContent = `
+    /* 解决右侧漏到显示器外延的问题：强制主视区安全内凹并留足右侧余量 */
+    div[class*="viewArea"],
+    div[class*="scrollBody"] {
+      box-sizing: border-box !important;
+      max-width: 100% !important;
+      overflow-x: hidden !important;
+    }
+
     /* 保证 [role="tablist"] 内的所有标签强制同一行排版、禁止折行换行 */
     div[role="tablist"] {
       display: flex !important;
@@ -392,7 +401,6 @@ function setupDynamicViewManager(ctx: Context) {
   const observer = new MutationObserver(() => syncTabBar())
   observer.observe(document.body, { childList: true, subtree: true })
 
-  // 监听会话变更与工作区切换事件，即时刷新当前工作区的视图状态
   if (ctx.sessions?.list) {
     ctx.sessions.list.subscribe(() => syncTabBar())
   }
