@@ -1,232 +1,113 @@
 {
-  "profile": {
-    "target": "国考 135+ (行测 70 / 申论 65) · 湖南省考 150 冲刺",
-    "stage": "P1 系统攻坚期 (8.18 - 9.27)",
-    "currentWeek": "第 3 周",
-    "daysLeft": 68,
-    "coreRule": "小马哥真题必动笔限时手写 · 能分类加小标题，30秒分不出大类直接填满原词采分点"
+  "meta": {
+    "updatedAt": "2026-09-06T12:00:00Z",
+    "title": "全功能人机协同测试大盘"
   },
-  "weeklySchedule": {
-    "1": [
-      {
-        "id": "mon-1",
-        "timeSlot": "09:00-10:30",
-        "module": "数量关系",
-        "title": "刘文超数量关系系统课 (高频题型攻坚)",
-        "targetMinutes": 90,
-        "done": false,
-        "resource": "B站 BV1nE411o7qp"
-      },
-      {
-        "id": "mon-2",
-        "timeSlot": "14:00-15:00",
-        "module": "资料分析",
-        "title": "资料分析 1 套限时训练 (做完三分类复盘)",
-        "targetMinutes": 35,
-        "done": false,
-        "resource": "真题卷限时"
-      },
-      {
-        "id": "mon-3",
-        "timeSlot": "19:30-20:30",
-        "module": "言语理解",
-        "title": "言语理解真题刷题 35 题 (维持题感)",
-        "targetMinutes": 40,
-        "done": false,
-        "resource": "题库自测"
-      }
-    ],
-    "2": [
-      {
-        "id": "tue-1",
-        "timeSlot": "09:00-10:30",
-        "module": "申论系统",
-        "title": "小马哥申论系统课 (定位材料原词，拒套模版)",
-        "targetMinutes": 90,
-        "done": false,
-        "resource": "B站 BV1YM4y137h3"
-      },
-      {
-        "id": "tue-2",
-        "timeSlot": "14:00-15:00",
-        "module": "资料分析",
-        "title": "资料分析 1 套限时训练 (目标达标率≥80%)",
-        "targetMinutes": 35,
-        "done": false,
-        "resource": "真题卷限时"
-      },
-      {
-        "id": "tue-3",
-        "timeSlot": "19:30-21:30",
-        "module": "🔥申论动笔",
-        "title": "🔥 申论小题动笔手写限时练 (0.5mm黑笔规范占格80%)",
-        "targetMinutes": 60,
-        "done": false,
-        "resource": "真题答题纸"
-      }
-    ],
-    "3": [
-      {
-        "id": "wed-1",
-        "timeSlot": "09:00-10:30",
-        "module": "数量关系",
-        "title": "刘文超数量关系系统课 (保6-8类高频必拿分题)",
-        "targetMinutes": 90,
-        "done": false,
-        "resource": "B站 BV1nE411o7qp"
-      },
-      {
-        "id": "wed-2",
-        "timeSlot": "14:00-15:00",
-        "module": "资料分析",
-        "title": "资料分析 1 套限时训练 (陷阱/速算/公式查漏)",
-        "targetMinutes": 35,
-        "done": false,
-        "resource": "真题卷限时"
-      },
-      {
-        "id": "wed-3",
-        "timeSlot": "19:30-20:30",
-        "module": "判断推理",
-        "title": "判断推理刷题 40 题 (图形/定义/类比/逻辑维持)",
-        "targetMinutes": 45,
-        "done": false,
-        "resource": "题库自测"
-      }
-    ],
-    "4": [
-      {
-        "id": "thu-1",
-        "timeSlot": "09:00-10:30",
-        "module": "申论系统",
-        "title": "小马哥申论系统课 (第2道起暂停先手写后听讲解)",
-        "targetMinutes": 90,
-        "done": false,
-        "resource": "B站 BV1YM4y137h3"
-      },
-      {
-        "id": "thu-2",
-        "timeSlot": "14:00-15:00",
-        "module": "资料分析",
-        "title": "资料分析 1 套限时训练 (错题本归纳)",
-        "targetMinutes": 35,
-        "done": false,
-        "resource": "真题卷限时"
-      },
-      {
-        "id": "thu-3",
-        "timeSlot": "19:30-21:30",
-        "module": "🔥申论动笔",
-        "title": "🔥 申论大作文/对策题实战 (红笔标出遗漏采分词)",
-        "targetMinutes": 60,
-        "done": false,
-        "resource": "真题答题纸"
-      }
-    ],
-    "5": [
-      {
-        "id": "fri-1",
-        "timeSlot": "09:00-10:30",
-        "module": "政治理论",
-        "title": "李铁 26 国考政治理论专项课 (时政要点)",
-        "targetMinutes": 90,
-        "done": false,
-        "resource": "B站 BV1rys3zEE1P"
-      },
-      {
-        "id": "fri-2",
-        "timeSlot": "14:00-15:00",
-        "module": "资料分析",
-        "title": "资料分析 1 套限时训练 (冲刺 90%+ 正确率)",
-        "targetMinutes": 35,
-        "done": false,
-        "resource": "真题卷限时"
-      },
-      {
-        "id": "fri-3",
-        "timeSlot": "19:30-20:30",
-        "module": "数量专题",
-        "title": "数量关系专题精练 15 题 (工程/行程/经济利润)",
-        "targetMinutes": 45,
-        "done": false,
-        "resource": "专项题集"
-      }
-    ],
-    "6": [
-      {
-        "id": "sat-1",
-        "timeSlot": "09:00-10:30",
-        "module": "常识判断",
-        "title": "马克公基与常识系统课",
-        "targetMinutes": 90,
-        "done": true,
-        "resource": "B站 BV17K411N7hU"
-      },
-      {
-        "id": "sat-2",
-        "timeSlot": "14:00-15:00",
-        "module": "资料分析",
-        "title": "资料分析 1 套限时训练 (本周压轴测试)",
-        "targetMinutes": 35,
-        "done": true,
-        "resource": "真题卷限时"
-      },
-      {
-        "id": "sat-3",
-        "timeSlot": "19:30-20:30",
-        "module": "错题清零",
-        "title": "本周全科目错题本深度清零与复盘",
-        "targetMinutes": 60,
-        "done": true,
-        "resource": "个人错题本"
-      }
-    ],
-    "7": [
-      {
-        "id": "sun-1",
-        "timeSlot": "09:00-11:00",
-        "module": "全真模考",
-        "title": "行测 120 分钟全真闭卷模考",
-        "targetMinutes": 120,
-        "done": false,
-        "resource": "粉笔周模考",
-        "actualMinutes": 1
-      },
-      {
-        "id": "sun-2",
-        "timeSlot": "14:00-17:00",
-        "module": "申论模考",
-        "title": "申论 180 分钟全真模考 (或模考深度复盘解析)",
-        "targetMinutes": 180,
-        "done": false,
-        "resource": "B站 BV1qo3w6wEAN"
-      },
-      {
-        "id": "sun-3",
-        "timeSlot": "19:30-20:30",
-        "module": "周休整顿",
-        "title": "周度指标检验 (行测达标率 + 申论篇数统计) 与休整",
-        "targetMinutes": 30,
-        "done": false,
-        "resource": "备考手记"
-      }
-    ]
-  },
-  "checkpoints": [
+  "columns": [
     {
-      "date": "9/27 (P1终期)",
-      "criteria": "模考行测 ≥65 分、申论累计实战动笔 ≥8 篇",
-      "action": "达标则进 P2 大题量阶段；否则砍数量保 5 类核心题"
+      "id": "planned",
+      "color": "#64748b",
+      "title": "待规划"
     },
     {
-      "date": "10/31 (报名前)",
-      "criteria": "行测 ≥68 且申论 ≥60",
-      "action": "达标冲刺热门/优选岗；否则转长株潭外围/苏南县级优先上岸"
+      "id": "todo",
+      "color": "#38bdf8",
+      "title": "待办"
     },
     {
-      "date": "11/20 (冲刺期)",
-      "criteria": "时政完成 2 轮背诵、申论累计写满 ≥20 篇",
-      "action": "全真套卷闭卷模拟考场生物钟"
+      "id": "in_progress",
+      "color": "#eab308",
+      "title": "进行中"
+    },
+    {
+      "id": "done",
+      "color": "#10b981",
+      "title": "完成"
+    },
+    {
+      "id": "failed",
+      "color": "#ef4444",
+      "title": "失败"
+    }
+  ],
+  "type": "standard_5cols",
+  "version": "1.0.0",
+  "tasks": [
+    {
+      "assignee": "ai",
+      "tags": [
+        "AI自动化",
+        "数据爬取"
+      ],
+      "createdAt": "2026-09-06T10:00:00Z",
+      "priority": "P0",
+      "id": "demo-task-01",
+      "source": "manual",
+      "title": "【AI任务示例】爬取目标站点接口数据并解析",
+      "targetMinutes": 15,
+      "columnId": "in_progress",
+      "desc": "点击右下角 [🚀 派发会话] 按钮，系统将自动创建独立工作区会话开始执行",
+      "claimedSessionId": "session-8b402ac7-ae56-4509-b924-12a3abd91842"
+    },
+    {
+      "assignee": "ai",
+      "tags": [
+        "人机接力",
+        "安全验证"
+      ],
+      "createdAt": "2026-09-06T10:15:00Z",
+      "priority": "P0",
+      "id": "demo-task-02",
+      "source": "ai",
+      "title": "【人机接力示例】自动化数据采集遇到滑块验证码",
+      "targetMinutes": 30,
+      "columnId": "in_progress",
+      "claimedSessionId": "session-demo-worker-99",
+      "desc": "模拟 AI 执行中遇到验证码阻断，展示橙色警示条"
+    },
+    {
+      "assignee": "human",
+      "tags": [
+        "人类专注",
+        "复习大纲"
+      ],
+      "createdAt": "2026-09-06T10:30:00Z",
+      "priority": "P1",
+      "id": "demo-task-03",
+      "source": "manual",
+      "title": "【人类任务示例】重点难点大纲梳理与方案手写",
+      "targetMinutes": 25,
+      "columnId": "todo",
+      "desc": "由人类自主专注完成，点击右下角 [⏱ 25m] 载入顶部倒计时，专注完成后打勾"
+    },
+    {
+      "assignee": "human",
+      "tags": [
+        "基建"
+      ],
+      "createdAt": "2026-09-06T09:00:00Z",
+      "priority": "P2",
+      "id": "demo-task-04",
+      "source": "manual",
+      "title": "【已完成示例】开发环境配置与依赖验证",
+      "targetMinutes": 20,
+      "columnId": "done",
+      "actualMinutes": 18,
+      "desc": "依赖与运行环境均已通过自测验证"
+    },
+    {
+      "reason": "目标 API 接口开启了 IP 白名单防火墙，当前网络无法直接访问",
+      "assignee": "ai",
+      "tags": [
+        "异常排查"
+      ],
+      "createdAt": "2026-09-06T09:30:00Z",
+      "priority": "P1",
+      "id": "demo-task-05",
+      "source": "ai",
+      "title": "【失败复盘示例】第三方未开放 API 接口请求失败",
+      "columnId": "failed",
+      "desc": "任务遇到网络 403 权限拒绝"
     }
   ]
 }

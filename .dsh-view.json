@@ -1,0 +1,6 @@
+{
+  "type": "tasks",
+  "templateId": "template-task-standard-5cols",
+  "title": "标准五列全流程流转看板",
+  "dataFile": "tasks.json"
+}

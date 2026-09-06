@@ -70,10 +70,7 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions, cordisCtx }:
   // 监听会话轮次结束事件：当会话完成一轮（由 busy 变 idle）时自动无感静默刷新看板
   useEffect(() => {
     if (!cordisCtx.sessions?.list) return
-    let lastPhase = cordisCtx.sessions.list.getSnapshot().phase
     const unsubscribe = cordisCtx.sessions.list.subscribe(() => {
-      const snap = cordisCtx.sessions.list.getSnapshot()
-      // 如果发生会话更新，静默重读一次 tasks.json
       if (workspaceId && cwd) {
         fetch('/api/workspace-canvas/status', {
           method: 'POST',
@@ -102,19 +99,37 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions, cordisCtx }:
     })
   }
 
-  // 桥接向当前会话发送指令
-  const handleSendToAi = (prompt: string) => {
+  // 辅助函数：自动切换到 [对话] 标签、填充文本并真正自动发送
+  const dispatchAndAutoSend = (text: string) => {
+    // 1. 切换到原生 [对话] tab
+    const chatTab = document.querySelector('button[role="tab"]') as HTMLButtonElement
+    if (chatTab) chatTab.click()
+
+    // 2. 通过 inputActions 填入 draft
     if (inputActions && typeof inputActions.setDraft === 'function') {
-      inputActions.setDraft(prompt)
-      const chatTab = document.querySelector('button[role="tab"]') as HTMLButtonElement
-      if (chatTab) chatTab.click()
-    } else {
-      navigator.clipboard?.writeText(prompt)
-      alert('✨ 复盘诊断提问已自动复制到剪贴板！可直接粘贴到底部输入框发送给 AI。')
+      inputActions.setDraft(text)
     }
+
+    // 3. 轮询安全触发自动提交 (让 React 和 Lexical 状态机完成文本挂载再触发 submit)
+    setTimeout(() => {
+      if (inputActions && typeof inputActions.submit === 'function') {
+        inputActions.submit()
+      } else {
+        // 兜底方案：模拟点击底部的发送按钮
+        const sendBtn = document.querySelector('button[class*="send"], button[aria-label*="Send"], button[aria-label*="发送"]') as HTMLButtonElement
+        if (sendBtn && !sendBtn.disabled) {
+          sendBtn.click()
+        }
+      }
+    }, 280)
   }
 
-  // 一键派发独立会话执行 AI 任务
+  // 桥接向当前会话发送指令（人工处理后通知）
+  const handleSendToAi = (prompt: string) => {
+    dispatchAndAutoSend(prompt)
+  }
+
+  // 一键派发独立会话执行 AI 任务（自动切换会话并自动发送）
   const handleDispatchAiSession = async (task: KanbanTaskItem): Promise<string | void> => {
     try {
       let newSessionId: string | undefined
@@ -130,7 +145,7 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions, cordisCtx }:
         throw new Error('无法创建新会话，DSH 会话服务未就绪')
       }
 
-      // 2. 构造该任务的初始目标 Prompt 并写入会话
+      // 2. 构造该任务的初始目标 Prompt
       const dispatchPrompt = [
         `【派发独立任务执行】`,
         `任务名称：${task.title}`,
@@ -145,20 +160,15 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions, cordisCtx }:
         `3. 若遇到无法解决的严重异常，请将本任务移入 "failed" 列并填写 reason 根因。`
       ].filter(Boolean).join('\n')
 
-      // 3. 打开该会话并将初始任务填入
+      // 3. 打开新会话
       if (cordisCtx.sessions?.open) {
         cordisCtx.sessions.open(newSessionId)
       }
 
-      // 延迟微秒写入 draft
+      // 4. 新会话挂载需要时间，延迟执行切换 Chat、注入 Draft 并自动发送
       setTimeout(() => {
-        if (inputActions && typeof inputActions.setDraft === 'function') {
-          inputActions.setDraft(dispatchPrompt)
-        }
-        // 切回 Chat 标签以供查看执行
-        const chatTab = document.querySelector('button[role="tab"]') as HTMLButtonElement
-        if (chatTab) chatTab.click()
-      }, 200)
+        dispatchAndAutoSend(dispatchPrompt)
+      }, 400)
 
       return newSessionId
     } catch (err: any) {
