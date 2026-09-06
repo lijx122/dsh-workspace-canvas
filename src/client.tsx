@@ -105,7 +105,7 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions, cordisCtx }:
     const chatTab = document.querySelector('button[role="tab"]') as HTMLButtonElement
     if (chatTab) chatTab.click()
 
-    // 2. 连续双重保障注入 Draft
+    // 2. 注入 Draft
     if (inputActions && typeof inputActions.setDraft === 'function') {
       inputActions.setDraft(targetText)
     }
@@ -115,19 +115,16 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions, cordisCtx }:
     const submitInterval = setInterval(() => {
       attempts++
 
-      // 持续确保 draft 已经就绪
       if (inputActions && typeof inputActions.setDraft === 'function') {
         inputActions.setDraft(targetText)
       }
 
-      // 方式 A：调用 DSH 官方 inputActions.submit
       if (inputActions && typeof inputActions.submit === 'function') {
         try {
           inputActions.submit()
         } catch (e) {}
       }
 
-      // 方式 B：直接检索页面上 DSH 原生的发送按钮（带 uV2eYG_primary / primary）
       const sendButton = document.querySelector('button[class*="primary"][aria-label*="Send"], button[class*="primary"][aria-label*="发送"], button[aria-label="Send"], button[aria-label="发送"]') as HTMLButtonElement | null
 
       if (sendButton && !sendButton.disabled) {
@@ -146,24 +143,29 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions, cordisCtx }:
     executeAutoSendPrompt(prompt)
   }
 
-  // 一键派发独立会话执行 AI 任务（直接在当前会话发车推进，免除跨会话空白与残损风险）
+  // 一键派发独立 subagent 执行 AI 任务（利用 subagent 后台并发机制，不阻塞主会话）
   const handleDispatchAiSession = async (task: KanbanTaskItem): Promise<string | void> => {
     try {
-      // 构造精准任务指令
+      // 构造结构化指令：要求主 Agent 立即调用 subagent 工具后台分发，不阻塞当前主会话
       const dispatchPrompt = [
-        `【开始执行任务：${task.title}】`,
-        task.desc ? `目标说明：${task.desc}` : '',
-        task.targetMinutes ? `限时：${task.targetMinutes} 分钟` : '',
+        `【派发后台子 Agent 执行任务】`,
+        `任务 ID：${task.id}`,
+        `任务名称：${task.title}`,
+        task.desc ? `任务说明：${task.desc}` : '',
+        task.targetMinutes ? `建议限时：${task.targetMinutes} 分钟` : '',
         `工作区根目录：${cwd}`,
         `----------------------------------------`,
-        `请阅读当前工作区相关文件，推进并完成上述任务。`,
-        `执行准则：`,
-        `1. 若执行完成，请使用工具更新根目录 ./tasks.json 将本任务 [ID: ${task.id}] 移入 "done" 列；`,
-        `2. 若中途遇到需要人类干预的硬性阻断（如验证码/扫码/密码/人工决策），请勿报错退出，请在 ./tasks.json 中将本任务标记 waitingHumanAction 简述原因，等待人类在看板确认；`,
-        `3. 若遇到无法解决的严重异常，请将本任务移入 "failed" 列并填写 reason 根因。`
+        `执行要求：`,
+        `请使用 subagent 工具启动一个后台独立子 Agent（参数必须包含 run_in_background: true）去推进该任务，不阻塞当前会话继续处理其他任务。`,
+        `子 Agent 的独立提示词要求：`,
+        `1. 专注完成工作区任务 "${task.title}"；`,
+        `2. 完成后直接调用工具修改 ./tasks.json 将 [ID: ${task.id}] 的 columnId 更新为 "done"；`,
+        `3. 若执行受阻需要人类介入，在 ./tasks.json 中将本任务标记 waitingHumanAction 说明阻断原因；`,
+        `4. 严重异常则将 columnId 更新为 "failed" 并附带 reason。`,
+        `启动子 Agent 后，请只简短回复 1 句话告知已在后台派发出子 Agent。`
       ].filter(Boolean).join('\n')
 
-      // 执行自动注入与自动发送
+      // 执行自动注入与发送
       executeAutoSendPrompt(dispatchPrompt)
 
       return sessionId

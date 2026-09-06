@@ -203,18 +203,30 @@ export function TaskView({
     }
   }
 
-  const handleMoveColumn = (taskId: string, targetColId: string) => {
-    if (targetColId === 'failed') {
-      const task = data?.tasks.find(t => t.id === taskId)
-      if (task) {
-        setFailModalTask(task)
-        setFailReason('')
-        return
-      }
+  // 逐级箭头跳列函数：方向 -1 (左跳) 或 +1 (右跳)
+  const handleStepJumpColumn = (taskId: string, direction: -1 | 1) => {
+    if (!data) return
+    const task = data.tasks.find(t => t.id === taskId)
+    if (!task) return
+
+    const currentIndex = data.columns.findIndex(c => c.id === task.columnId)
+    if (currentIndex === -1) return
+
+    const nextIndex = currentIndex + direction
+    if (nextIndex < 0 || nextIndex >= data.columns.length) return
+
+    const targetCol = data.columns[nextIndex]
+
+    // 如果跳到失败列，弹出失败原因对话框
+    if (targetCol.id === 'failed') {
+      setFailModalTask(task)
+      setFailReason('')
+      return
     }
+
     updateBoard(prev => ({
       ...prev,
-      tasks: prev.tasks.map(t => (t.id === taskId ? { ...t, columnId: targetColId } : t))
+      tasks: prev.tasks.map(t => (t.id === taskId ? { ...t, columnId: targetCol.id } : t))
     }))
   }
 
@@ -232,19 +244,18 @@ export function TaskView({
     setFailReason('')
   }
 
-  // 一键将 AI 任务派发为独立工作区新会话
+  // 一键派发独立 subagent 执行 AI 任务
   const handleTriggerDispatchAi = async (task: KanbanTaskItem) => {
     if (!onDispatchAiSession) return
     setDispatchingId(task.id)
     try {
-      const newSessionId = await onDispatchAiSession(task)
-      if (newSessionId) {
-        // 更新任务卡片绑定
+      const activeSessionId = await onDispatchAiSession(task)
+      if (activeSessionId) {
         updateBoard(prev => ({
           ...prev,
           tasks: prev.tasks.map(t =>
             t.id === task.id
-              ? { ...t, columnId: 'in_progress', claimedSessionId: newSessionId, assignee: 'ai' }
+              ? { ...t, columnId: 'in_progress', claimedSessionId: activeSessionId, assignee: 'ai' }
               : t
           )
         }))
@@ -256,7 +267,7 @@ export function TaskView({
     }
   }
 
-  // 人类完成阻断干预，唤醒 AI 会话继续执行
+  // 人类完成阻断干预，通知 AI 继续
   const handleResolveHumanBlock = (task: KanbanTaskItem) => {
     updateBoard(prev => ({
       ...prev,
@@ -267,12 +278,10 @@ export function TaskView({
       )
     }))
 
-    // 若绑定了会话，向该会话发送唤醒恢复指令
     const resumePrompt = `【人类干预完成通知】已在工作区完成要求的人工动作（如验证码/登录/确认），请从阻断处继续推进任务：${task.title}`
     if (onSendToAi) {
       onSendToAi(resumePrompt)
     }
-    alert('✔ 已确认人工处理完毕！已通知会话继续推进任务。')
   }
 
   const handleSaveTask = () => {
@@ -471,10 +480,9 @@ export function TaskView({
               background: 'rgba(249, 115, 22, 0.15)',
               border: '1px solid rgba(249, 115, 22, 0.3)',
               padding: '1px 6px',
-              borderRadius: '4px',
-              animation: 'pulse 1.5s infinite'
+              borderRadius: '4px'
             }}>
-              🚨 {waitingHumanCount} 个任务等待人工干预
+              🚨 {waitingHumanCount} 个任务等待人工处理
             </span>
           )}
         </div>
@@ -504,7 +512,7 @@ export function TaskView({
         </div>
       </div>
 
-      {/* 人类专注计时条 (仅当有人类计时进行中或空闲时呈现) */}
+      {/* 人类专注计时条 */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -521,7 +529,7 @@ export function TaskView({
           <span style={{ fontSize: '16px' }}>⏱</span>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--dsw-alias-label-secondary, #a0a0a8)' }}>
-              {activeTimerTask ? `人类专注进行中` : '人类任务点击 [⏱] 载入限时计时；AI 任务点击 [🚀 派发会话] 直接开会话执行'}
+              {activeTimerTask ? `人类专注进行中` : '人类任务点击 [⏱] 载入限时计时；AI 任务点击 [🚀 派发会话] 直接调起后台子 Agent 并发推进'}
             </div>
             <div style={{ fontSize: '13px', fontWeight: 600, color: activeTimerTask ? '#60a5fa' : '#f0f0f2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {activeTimerTask ? activeTimerTask.title : '人机双轨协作中枢'}
@@ -593,9 +601,11 @@ export function TaskView({
         overflowY: 'hidden',
         paddingBottom: '4px'
       }}>
-        {data.columns.map(col => {
+        {data.columns.map((col, colIdx) => {
           const colTasks = data.tasks.filter(t => t.columnId === col.id)
           const colColor = col.color || (col.id === 'done' ? '#10b981' : col.id === 'failed' ? '#ef4444' : col.id === 'in_progress' ? '#eab308' : '#38bdf8')
+          const isFirstCol = colIdx === 0
+          const isLastCol = colIdx === data.columns.length - 1
 
           return (
             <div
@@ -695,7 +705,6 @@ export function TaskView({
                       {/* 卡片顶行：责任标签 + 标题 + 优先级 */}
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', flex: 1, minWidth: 0 }}>
-                          {/* 人机标识徽章 */}
                           <span style={{
                             fontSize: '10px',
                             fontWeight: 700,
@@ -739,7 +748,7 @@ export function TaskView({
                         </div>
                       )}
 
-                      {/* AI 遇到人机验证阻断的警示横幅 */}
+                      {/* AI 人机阻断提示横幅 */}
                       {isWaitingHuman && (
                         <div style={{
                           fontSize: '11px',
@@ -778,31 +787,6 @@ export function TaskView({
                         </div>
                       )}
 
-                      {/* 绑定的 AI 执行会话入口 */}
-                      {task.claimedSessionId && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
-                          <span style={{ color: 'var(--dsw-alias-label-tertiary)' }}>执行会话:</span>
-                          <button
-                            onClick={() => onOpenSession?.(task.claimedSessionId!)}
-                            style={{
-                              background: 'rgba(167, 139, 250, 0.1)',
-                              border: '1px solid rgba(167, 139, 250, 0.25)',
-                              color: '#c4b5fd',
-                              padding: '1px 6px',
-                              borderRadius: '4px',
-                              fontSize: '10.5px',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '3px'
-                            }}
-                          >
-                            <span>💬 {task.claimedSessionId.slice(0, 10)}...</span>
-                            <span>↗</span>
-                          </button>
-                        </div>
-                      )}
-
                       {task.tags && task.tags.length > 0 && (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                           {task.tags.map(tag => (
@@ -820,7 +804,7 @@ export function TaskView({
                         </div>
                       )}
 
-                      {/* 卡片底栏：人机动作区分 */}
+                      {/* 卡片底栏：动作与单向箭头流转 */}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -863,29 +847,54 @@ export function TaskView({
                           )}
                         </div>
 
-                        {/* 流转选择与删除 */}
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          <select
-                            value={task.columnId}
-                            onChange={e => handleMoveColumn(task.id, e.target.value)}
-                            style={{
-                              background: '#1a1a1c',
-                              border: '1px solid rgba(255,255,255,0.1)',
-                              borderRadius: '3px',
-                              color: '#ccc',
-                              fontSize: '10.5px',
-                              outline: 'none',
-                              padding: '1px 2px'
-                            }}
-                          >
-                            {data.columns.map(c => (
-                              <option key={c.id} value={c.id}>{c.title}</option>
-                            ))}
-                          </select>
+                        {/* 直观的单向箭头逐级跳列按钮组 [←] [→] 与删除 */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          {/* 向左跳一列 */}
+                          {!isFirstCol && (
+                            <button
+                              onClick={() => handleStepJumpColumn(task.id, -1)}
+                              title={`向左跳至【${data.columns[colIdx - 1]?.title}】`}
+                              style={{
+                                background: 'var(--dsw-alias-bg-layer-2, #212124)',
+                                border: '1px solid var(--dsw-alias-border-l2, rgba(255,255,255,0.1))',
+                                color: '#cbd5e1',
+                                borderRadius: '3px',
+                                padding: '1px 6px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                lineHeight: '14px'
+                              }}
+                            >
+                              ←
+                            </button>
+                          )}
+
+                          {/* 向右跳一列 */}
+                          {!isLastCol && (
+                            <button
+                              onClick={() => handleStepJumpColumn(task.id, 1)}
+                              title={`向右跳至【${data.columns[colIdx + 1]?.title}】`}
+                              style={{
+                                background: 'var(--dsw-alias-bg-layer-2, #212124)',
+                                border: '1px solid var(--dsw-alias-border-l2, rgba(255,255,255,0.1))',
+                                color: '#cbd5e1',
+                                borderRadius: '3px',
+                                padding: '1px 6px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                lineHeight: '14px'
+                              }}
+                            >
+                              →
+                            </button>
+                          )}
+
                           <button
                             onClick={() => handleDeleteTask(task.id)}
                             title="删除"
-                            style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: '10px' }}
+                            style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: '10px', marginLeft: '3px' }}
                           >
                             ✕
                           </button>
@@ -942,7 +951,6 @@ export function TaskView({
               style={{ background: '#151517', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', padding: '6px 8px', color: '#fff', fontSize: '12px', outline: 'none' }}
             />
 
-            {/* 责任人选择：人类 vs AI */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px' }}>
               <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>责任人:</span>
               <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
