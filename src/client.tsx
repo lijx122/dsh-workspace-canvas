@@ -99,59 +99,62 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions, cordisCtx }:
     })
   }
 
-  // 辅助函数：自动切换到 [对话] 标签、填充文本并真正自动发送
-  const dispatchAndAutoSend = (text: string) => {
-    // 1. 切换到原生 [对话] tab
+  // 坚固的自动发送推进器：切到对话、安全注入草稿并触发提交
+  const executeAutoSendPrompt = (targetText: string) => {
+    // 1. 切换回 [对话] 标签页
     const chatTab = document.querySelector('button[role="tab"]') as HTMLButtonElement
     if (chatTab) chatTab.click()
 
-    // 2. 通过 inputActions 填入 draft
+    // 2. 连续双重保障注入 Draft
     if (inputActions && typeof inputActions.setDraft === 'function') {
-      inputActions.setDraft(text)
+      inputActions.setDraft(targetText)
     }
 
-    // 3. 轮询安全触发自动提交 (让 React 和 Lexical 状态机完成文本挂载再触发 submit)
-    setTimeout(() => {
-      if (inputActions && typeof inputActions.submit === 'function') {
-        inputActions.submit()
-      } else {
-        // 兜底方案：模拟点击底部的发送按钮
-        const sendBtn = document.querySelector('button[class*="send"], button[aria-label*="Send"], button[aria-label*="发送"]') as HTMLButtonElement
-        if (sendBtn && !sendBtn.disabled) {
-          sendBtn.click()
-        }
+    // 3. 轮询检测发送按钮或调用 submit 完成发车
+    let attempts = 0
+    const submitInterval = setInterval(() => {
+      attempts++
+
+      // 持续确保 draft 已经就绪
+      if (inputActions && typeof inputActions.setDraft === 'function') {
+        inputActions.setDraft(targetText)
       }
-    }, 280)
+
+      // 方式 A：调用 DSH 官方 inputActions.submit
+      if (inputActions && typeof inputActions.submit === 'function') {
+        try {
+          inputActions.submit()
+        } catch (e) {}
+      }
+
+      // 方式 B：直接检索页面上 DSH 原生的发送按钮（带 uV2eYG_primary / primary）
+      const sendButton = document.querySelector('button[class*="primary"][aria-label*="Send"], button[class*="primary"][aria-label*="发送"], button[aria-label="Send"], button[aria-label="发送"]') as HTMLButtonElement | null
+
+      if (sendButton && !sendButton.disabled) {
+        sendButton.click()
+        clearInterval(submitInterval)
+      }
+
+      if (attempts >= 8) {
+        clearInterval(submitInterval)
+      }
+    }, 150)
   }
 
   // 桥接向当前会话发送指令（人工处理后通知）
   const handleSendToAi = (prompt: string) => {
-    dispatchAndAutoSend(prompt)
+    executeAutoSendPrompt(prompt)
   }
 
-  // 一键派发独立会话执行 AI 任务（自动切换会话并自动发送）
+  // 一键派发独立会话执行 AI 任务（直接在当前会话发车推进，免除跨会话空白与残损风险）
   const handleDispatchAiSession = async (task: KanbanTaskItem): Promise<string | void> => {
     try {
-      let newSessionId: string | undefined
-
-      // 1. 调用 DSH 原生接口创建属于当前工作区的全新会话
-      if (cordisCtx.sessions?.create) {
-        newSessionId = await cordisCtx.sessions.create({ workspaceId })
-      } else if (cordisCtx.uiWorkspace?.connectWorkspace) {
-        newSessionId = await cordisCtx.uiWorkspace.connectWorkspace(workspaceId)
-      }
-
-      if (!newSessionId) {
-        throw new Error('无法创建新会话，DSH 会话服务未就绪')
-      }
-
-      // 2. 构造该任务的初始目标 Prompt
+      // 构造精准任务指令
       const dispatchPrompt = [
-        `【派发独立任务执行】`,
-        `任务名称：${task.title}`,
+        `【开始执行任务：${task.title}】`,
         task.desc ? `目标说明：${task.desc}` : '',
-        task.targetMinutes ? `建议限时：${task.targetMinutes} 分钟` : '',
-        `工作区路径：${cwd}`,
+        task.targetMinutes ? `限时：${task.targetMinutes} 分钟` : '',
+        `工作区根目录：${cwd}`,
         `----------------------------------------`,
         `请阅读当前工作区相关文件，推进并完成上述任务。`,
         `执行准则：`,
@@ -160,17 +163,10 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions, cordisCtx }:
         `3. 若遇到无法解决的严重异常，请将本任务移入 "failed" 列并填写 reason 根因。`
       ].filter(Boolean).join('\n')
 
-      // 3. 打开新会话
-      if (cordisCtx.sessions?.open) {
-        cordisCtx.sessions.open(newSessionId)
-      }
+      // 执行自动注入与自动发送
+      executeAutoSendPrompt(dispatchPrompt)
 
-      // 4. 新会话挂载需要时间，延迟执行切换 Chat、注入 Draft 并自动发送
-      setTimeout(() => {
-        dispatchAndAutoSend(dispatchPrompt)
-      }, 400)
-
-      return newSessionId
+      return sessionId
     } catch (err: any) {
       console.error('[dsh-workspace-canvas] dispatch failed:', err)
       throw err
