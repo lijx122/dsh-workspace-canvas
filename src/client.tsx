@@ -135,11 +135,13 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions }: { sessionI
 
   return (
     <TaskView
+      key={`${workspaceId}_${cwd}`}
       workspaceId={workspaceId}
       cwd={cwd}
       initialData={tasksData}
       onSave={handleSave}
       onSendToAi={handleSendToAi}
+      onReloadStatus={loadStatus}
     />
   )
 }

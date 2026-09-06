@@ -8,14 +8,6 @@ const TEMPLATES_DIR = resolve(__dirname, '../templates')
 
 export const inject = ['webServer', 'workspaceRegistry']
 
-export interface WorkspaceStatusResult {
-  hasTasks: boolean
-  hasDesign: boolean
-  hasVideo: boolean
-  hasStock: boolean
-  tasksData?: any
-}
-
 export function apply(ctx: Context) {
   // 注册 HTTP API 服务供前端 client 调用
   ctx.effect(() => {
@@ -65,7 +57,6 @@ export function apply(ctx: Context) {
             }
 
             if (action === 'status') {
-              // 检测工作区指纹
               const checkExists = async (relPath: string) => {
                 try {
                   await access(resolve(workspaceCwd, relPath))
@@ -75,7 +66,18 @@ export function apply(ctx: Context) {
                 }
               }
 
-              const hasTasks = await checkExists('tasks.json')
+              // 1. 嗅探是否具备 .dsh-view.json (显式声明)
+              const hasViewConfig = await checkExists('.dsh-view.json')
+              let viewConfig: any = null
+              if (hasViewConfig) {
+                try {
+                  viewConfig = JSON.parse(await readFile(resolve(workspaceCwd, '.dsh-view.json'), 'utf8'))
+                } catch {}
+              }
+
+              // 2. 嗅探任务文件：优先读配置里的 dataFile，否则读 tasks.json
+              const tasksFileName = viewConfig?.dataFile || 'tasks.json'
+              const hasTasks = await checkExists(tasksFileName)
               const hasDesign = await checkExists('design')
               const hasVideo = await checkExists('video')
               const hasStock = await checkExists('watchlist.json')
@@ -83,7 +85,7 @@ export function apply(ctx: Context) {
               let tasksData = null
               if (hasTasks) {
                 try {
-                  tasksData = JSON.parse(await readFile(resolve(workspaceCwd, 'tasks.json'), 'utf8'))
+                  tasksData = JSON.parse(await readFile(resolve(workspaceCwd, tasksFileName), 'utf8'))
                 } catch (e) {
                   // 容错保持 null
                 }
@@ -92,37 +94,54 @@ export function apply(ctx: Context) {
               return sendJson(200, {
                 ok: true,
                 status: {
+                  cwd: workspaceCwd,
+                  workspaceId,
                   hasTasks,
                   hasDesign,
                   hasVideo,
                   hasStock,
+                  viewConfig,
                   tasksData
                 }
               })
             }
 
             if (action === 'save-tasks') {
-              // 保存/更新 tasks.json
               const tasksData = body.tasksData
               if (!tasksData) {
                 return sendJson(400, { ok: false, error: '缺少 tasksData 数据' })
               }
-              const targetPath = resolve(workspaceCwd, 'tasks.json')
+              const targetFile = body.targetFile || 'tasks.json'
+              const targetPath = resolve(workspaceCwd, targetFile)
               await writeFile(targetPath, JSON.stringify(tasksData, null, 2), 'utf8')
               return sendJson(200, { ok: true })
             }
 
             if (action === 'apply-template') {
-              // 将选定模板初始化写入工作区
               const templateId = body.templateId
               let templatePath = resolve(TEMPLATES_DIR, 'general-task.json')
               if (templateId === 'template-task-shenlun') {
                 templatePath = resolve(TEMPLATES_DIR, 'shenlun-task.json')
               }
               const templateContent = JSON.parse(await readFile(templatePath, 'utf8'))
-              const targetPath = resolve(workspaceCwd, 'tasks.json')
+              const targetFile = templateContent.targetFile || 'tasks.json'
+              const targetPath = resolve(workspaceCwd, targetFile)
               await writeFile(targetPath, JSON.stringify(templateContent.data, null, 2), 'utf8')
-              return sendJson(200, { ok: true, tasksData: templateContent.data })
+
+              // 同时生成/更新 .dsh-view.json 绑定当前工作区类型
+              const viewConfig = {
+                type: 'tasks',
+                templateId,
+                title: templateContent.name,
+                dataFile: targetFile
+              }
+              await writeFile(resolve(workspaceCwd, '.dsh-view.json'), JSON.stringify(viewConfig, null, 2), 'utf8')
+
+              return sendJson(200, {
+                ok: true,
+                tasksData: templateContent.data,
+                viewConfig
+              })
             }
           }
 
