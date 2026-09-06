@@ -30,10 +30,10 @@ export function apply(ctx: Context) {
 
         try {
           if (req.method === 'GET' && action === 'templates') {
-            // 获取内置模板列表
-            const shenlun = JSON.parse(await readFile(resolve(TEMPLATES_DIR, 'shenlun-task.json'), 'utf8'))
-            const general = JSON.parse(await readFile(resolve(TEMPLATES_DIR, 'general-task.json'), 'utf8'))
-            return sendJson(200, { ok: true, templates: [shenlun, general] })
+            // 获取内置模板列表：1. 标准五列看板 2. 自定义空白看板
+            const standard5 = JSON.parse(await readFile(resolve(TEMPLATES_DIR, 'standard-5cols.json'), 'utf8'))
+            const customTpl = JSON.parse(await readFile(resolve(TEMPLATES_DIR, 'custom-task.json'), 'utf8'))
+            return sendJson(200, { ok: true, templates: [standard5, customTpl] })
           }
 
           if (req.method === 'POST') {
@@ -119,9 +119,9 @@ export function apply(ctx: Context) {
 
             if (action === 'apply-template') {
               const templateId = body.templateId
-              let templatePath = resolve(TEMPLATES_DIR, 'general-task.json')
-              if (templateId === 'template-task-shenlun') {
-                templatePath = resolve(TEMPLATES_DIR, 'shenlun-task.json')
+              let templatePath = resolve(TEMPLATES_DIR, 'standard-5cols.json')
+              if (templateId === 'template-task-custom') {
+                templatePath = resolve(TEMPLATES_DIR, 'custom-task.json')
               }
               const templateContent = JSON.parse(await readFile(templatePath, 'utf8'))
               const targetFile = templateContent.targetFile || 'tasks.json'

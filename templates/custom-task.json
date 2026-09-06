@@ -1,0 +1,34 @@
+{
+  "id": "template-task-custom",
+  "name": "自由自定义空白看板",
+  "category": "custom",
+  "description": "轻量初始模板，列名称、列数量、任务结构与标签完全由用户随心自由定制",
+  "targetFile": "tasks.json",
+  "data": {
+    "version": "1.0.0",
+    "type": "custom",
+    "meta": {
+      "title": "自定义看板",
+      "description": "自由增删列与任务，按需排版",
+      "updatedAt": "2026-09-05T20:00:00Z"
+    },
+    "columns": [
+      { "id": "col-1", "title": "自定义列一", "color": "#38bdf8" },
+      { "id": "col-2", "title": "自定义列二", "color": "#eab308" },
+      { "id": "col-3", "title": "自定义列三", "color": "#10b981" }
+    ],
+    "tasks": [
+      {
+        "id": "custom-task-01",
+        "columnId": "col-1",
+        "title": "示例自定义任务卡片 (可点击编辑或删除)",
+        "desc": "可通过上方 [+ 加列] 或卡片底部自由增删",
+        "priority": "P1",
+        "tags": ["自定义"],
+        "targetMinutes": 25,
+        "source": "manual",
+        "createdAt": "2026-09-05T10:00:00Z"
+      }
+    ]
+  }
+}

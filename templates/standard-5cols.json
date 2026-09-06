@@ -1,0 +1,47 @@
+{
+  "id": "template-task-standard-5cols",
+  "name": "标准五列全流程流转看板",
+  "category": "standard",
+  "description": "待规划、待办、进行中、完成、失败五列完整闭环，适用于目标拆解、执行跟进与复盘归档",
+  "targetFile": "tasks.json",
+  "data": {
+    "version": "1.0.0",
+    "type": "standard_5cols",
+    "meta": {
+      "title": "工作区核心任务流转看板",
+      "description": "按规划、执行、结果全周期追踪任务",
+      "updatedAt": "2026-09-05T20:00:00Z"
+    },
+    "columns": [
+      { "id": "planned", "title": "待规划", "color": "#64748b" },
+      { "id": "todo", "title": "待办", "color": "#38bdf8" },
+      { "id": "in_progress", "title": "进行中", "color": "#eab308" },
+      { "id": "done", "title": "完成", "color": "#10b981" },
+      { "id": "failed", "title": "失败", "color": "#ef4444" }
+    ],
+    "tasks": [
+      {
+        "id": "task-01",
+        "columnId": "planned",
+        "title": "阶段目标拆解与资源准备",
+        "desc": "明确核心关键指标与交付时间节点",
+        "priority": "P1",
+        "tags": ["规划", "大纲"],
+        "targetMinutes": 30,
+        "source": "manual",
+        "createdAt": "2026-09-05T10:00:00Z"
+      },
+      {
+        "id": "task-02",
+        "columnId": "todo",
+        "title": "核心重点任务实战攻坚",
+        "desc": "限时专注执行，记录关键难点与盲区",
+        "priority": "P0",
+        "tags": ["重点", "执行"],
+        "targetMinutes": 45,
+        "source": "manual",
+        "createdAt": "2026-09-05T10:30:00Z"
+      }
+    ]
+  }
+}
