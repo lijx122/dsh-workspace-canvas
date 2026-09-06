@@ -11,6 +11,7 @@ export interface KanbanTaskItem {
   columnId: string
   title: string
   desc?: string
+  assignee?: 'human' | 'ai' // 人机双轨归属
   priority?: 'P0' | 'P1' | 'P2'
   tags?: string[]
   targetMinutes?: number
@@ -18,6 +19,8 @@ export interface KanbanTaskItem {
   source?: 'ai' | 'manual'
   createdAt?: string
   reason?: string // 失败原因或复盘要点
+  claimedSessionId?: string // 关联绑定的 AI 执行会话 ID
+  waitingHumanAction?: string // 当 AI 遇阻时，要求人类完成的阻断事项说明
 }
 
 export interface CanvasBoardData {
@@ -32,14 +35,6 @@ export interface CanvasBoardData {
   tasks: KanbanTaskItem[]
 }
 
-const DEFAULT_5_COLS: KanbanColumn[] = [
-  { id: 'planned', title: '待规划', color: '#64748b' },
-  { id: 'todo', title: '待办', color: '#38bdf8' },
-  { id: 'in_progress', title: '进行中', color: '#eab308' },
-  { id: 'done', title: '完成', color: '#10b981' },
-  { id: 'failed', title: '失败', color: '#ef4444' }
-]
-
 export function TaskView({
   workspaceId,
   cwd,
@@ -47,7 +42,9 @@ export function TaskView({
   viewConfig,
   onSave,
   onSendToAi,
-  onReloadStatus
+  onReloadStatus,
+  onDispatchAiSession,
+  onOpenSession
 }: {
   workspaceId: string
   cwd: string
@@ -56,8 +53,9 @@ export function TaskView({
   onSave: (data: any) => Promise<void>
   onSendToAi?: (prompt: string) => void
   onReloadStatus?: () => Promise<void>
+  onDispatchAiSession?: (task: KanbanTaskItem) => Promise<string | void>
+  onOpenSession?: (sessionId: string) => void
 }) {
-  // 数据格式自适应：如果有 columns 和 tasks 则为通用看板
   const normalizeData = (raw: any): CanvasBoardData | null => {
     if (!raw) return null
     if (Array.isArray(raw.columns) && Array.isArray(raw.tasks)) {
@@ -84,6 +82,7 @@ export function TaskView({
   const [editingTask, setEditingTask] = useState<KanbanTaskItem | null>(null)
   const [formTitle, setFormTitle] = useState('')
   const [formDesc, setFormDesc] = useState('')
+  const [formAssignee, setFormAssignee] = useState<'human' | 'ai'>('human')
   const [formPriority, setFormPriority] = useState<'P0' | 'P1' | 'P2'>('P1')
   const [formMinutes, setFormMinutes] = useState<number>(25)
   const [formTags, setFormTags] = useState('')
@@ -96,7 +95,9 @@ export function TaskView({
   const [showAddColModal, setShowAddColModal] = useState(false)
   const [newColTitle, setNewColTitle] = useState('')
 
-  // 无数据时拉取系统提供的模板供用户二选一初始化
+  // 派发 loading
+  const [dispatchingId, setDispatchingId] = useState<string | null>(null)
+
   useEffect(() => {
     if (!data) {
       fetch('/api/workspace-canvas/templates')
@@ -108,7 +109,6 @@ export function TaskView({
     }
   }, [data])
 
-  // 应用所选模板初始化
   const handleApplyTemplate = async (templateId: string) => {
     setSyncing(true)
     try {
@@ -127,7 +127,7 @@ export function TaskView({
     }
   }
 
-  // 倒计时计时心跳
+  // 倒计时心跳
   useEffect(() => {
     let timer: any = null
     if (isTimerRunning && secondsRemaining > 0) {
@@ -148,7 +148,6 @@ export function TaskView({
     return () => clearInterval(timer)
   }, [isTimerRunning, secondsRemaining, activeTimerTask])
 
-  // 倒计时结束：自动流转到 [完成] 列
   const handleTimerAutoComplete = (taskId: string, targetMin: number) => {
     updateBoard(prev => ({
       ...prev,
@@ -158,10 +157,9 @@ export function TaskView({
           : t
       )
     }))
-    alert(`🎉 限时结束！任务已自动标记流转至【完成】！`)
+    alert(`🎉 限时结束！人类任务已自动标记流转至【完成】！`)
   }
 
-  // 启动某任务计时
   const handleStartTimer = (task: KanbanTaskItem) => {
     if (activeTimerTask?.id === task.id && isTimerRunning) {
       setIsTimerRunning(false)
@@ -173,7 +171,6 @@ export function TaskView({
     setIsTimerRunning(true)
   }
 
-  // 提前完成计时
   const handleFinishTimerEarly = () => {
     if (!activeTimerTask) return
     const targetMin = activeTimerTask.targetMinutes || 25
@@ -194,7 +191,6 @@ export function TaskView({
     setSecondsRemaining(0)
   }
 
-  // 统一保存更新看板
   const updateBoard = async (updater: (prev: CanvasBoardData) => CanvasBoardData) => {
     if (!data) return
     const next = updater(data)
@@ -207,7 +203,6 @@ export function TaskView({
     }
   }
 
-  // 快速移动列
   const handleMoveColumn = (taskId: string, targetColId: string) => {
     if (targetColId === 'failed') {
       const task = data?.tasks.find(t => t.id === taskId)
@@ -223,7 +218,6 @@ export function TaskView({
     }))
   }
 
-  // 提交失败并记录原因
   const handleCommitFailed = () => {
     if (!failModalTask) return
     updateBoard(prev => ({
@@ -238,7 +232,49 @@ export function TaskView({
     setFailReason('')
   }
 
-  // 保存新建任务
+  // 一键将 AI 任务派发为独立工作区新会话
+  const handleTriggerDispatchAi = async (task: KanbanTaskItem) => {
+    if (!onDispatchAiSession) return
+    setDispatchingId(task.id)
+    try {
+      const newSessionId = await onDispatchAiSession(task)
+      if (newSessionId) {
+        // 更新任务卡片绑定
+        updateBoard(prev => ({
+          ...prev,
+          tasks: prev.tasks.map(t =>
+            t.id === task.id
+              ? { ...t, columnId: 'in_progress', claimedSessionId: newSessionId, assignee: 'ai' }
+              : t
+          )
+        }))
+      }
+    } catch (err: any) {
+      alert(`派发失败: ${err.message || '未知错误'}`)
+    } finally {
+      setDispatchingId(null)
+    }
+  }
+
+  // 人类完成阻断干预，唤醒 AI 会话继续执行
+  const handleResolveHumanBlock = (task: KanbanTaskItem) => {
+    updateBoard(prev => ({
+      ...prev,
+      tasks: prev.tasks.map(t =>
+        t.id === task.id
+          ? { ...t, waitingHumanAction: undefined }
+          : t
+      )
+    }))
+
+    // 若绑定了会话，向该会话发送唤醒恢复指令
+    const resumePrompt = `【人类干预完成通知】已在工作区完成要求的人工动作（如验证码/登录/确认），请从阻断处继续推进任务：${task.title}`
+    if (onSendToAi) {
+      onSendToAi(resumePrompt)
+    }
+    alert('✔ 已确认人工处理完毕！已通知会话继续推进任务。')
+  }
+
   const handleSaveTask = () => {
     if (!formTitle.trim()) return
     const tags = formTags.trim() ? formTags.split(/[,，\s]+/) : []
@@ -252,6 +288,7 @@ export function TaskView({
                 ...t,
                 title: formTitle.trim(),
                 desc: formDesc.trim() || undefined,
+                assignee: formAssignee,
                 priority: formPriority,
                 targetMinutes: formMinutes,
                 tags: tags.length ? tags : undefined
@@ -265,6 +302,7 @@ export function TaskView({
         columnId: createModalCol || (data?.columns[0]?.id ?? 'planned'),
         title: formTitle.trim(),
         desc: formDesc.trim() || undefined,
+        assignee: formAssignee,
         priority: formPriority,
         targetMinutes: formMinutes,
         tags: tags.length ? tags : undefined,
@@ -284,7 +322,6 @@ export function TaskView({
     setFormTags('')
   }
 
-  // 删除任务
   const handleDeleteTask = (taskId: string) => {
     if (!confirm('确定删除该任务卡片吗？')) return
     updateBoard(prev => ({
@@ -293,7 +330,6 @@ export function TaskView({
     }))
   }
 
-  // 新增自定义列
   const handleAddCustomColumn = () => {
     if (!newColTitle.trim()) return
     const newColId = `col-${Date.now()}`
@@ -305,7 +341,6 @@ export function TaskView({
     setShowAddColModal(false)
   }
 
-  // 删除自定义列
   const handleDeleteColumn = (colId: string) => {
     if (!confirm('确定删除该列吗？该列内的任务将自动移至第一列。')) return
     updateBoard(prev => {
@@ -319,38 +354,12 @@ export function TaskView({
     })
   }
 
-  // 格式化时间
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60)
     const s = secs % 60
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   }
 
-  // 向 AI 发送复盘诊断
-  const handleDispatchAiPrompt = (task: KanbanTaskItem) => {
-    const prompt = [
-      `【工作区任务复盘与执行诊断】`,
-      `工作区路径：${cwd}`,
-      `任务名称：${task.title}`,
-      `当前状态：${task.columnId === 'done' ? '已完成' : task.columnId === 'failed' ? '失败/阻塞' : '进行中'}`,
-      task.reason ? `失败卡点或原因：${task.reason}` : '',
-      task.desc ? `任务说明：${task.desc}` : '',
-      task.actualMinutes ? `实际执行耗时：${task.actualMinutes} 分钟` : '',
-      `----------------------------------------`,
-      `请结合当前任务情况给出：`,
-      `1. 针对该任务的执行难点或失败原因的改进对策；`,
-      `2. 是否需要将该任务拆解为下一步的具体可执行子任务并写回 tasks.json。`
-    ].filter(Boolean).join('\n')
-
-    if (onSendToAi) {
-      onSendToAi(prompt)
-    } else {
-      navigator.clipboard?.writeText(prompt)
-      alert('✨ 复盘提示已复制到剪贴板！可直接粘贴到底部输入框。')
-    }
-  }
-
-  // 1. 无数据时：展示专属二选一模板选用页
   if (!data) {
     return (
       <div style={{
@@ -401,11 +410,11 @@ export function TaskView({
     )
   }
 
-  // 计算任务统计
   const totalCount = data.tasks.length
   const doneCount = data.tasks.filter(t => t.columnId === 'done').length
   const failedCount = data.tasks.filter(t => t.columnId === 'failed').length
   const inProgressCount = data.tasks.filter(t => t.columnId === 'in_progress').length
+  const waitingHumanCount = data.tasks.filter(t => Boolean(t.waitingHumanAction)).length
   const workspaceTitle = cwd.split(/[\/\\]/).pop() || workspaceId
 
   return (
@@ -426,7 +435,7 @@ export function TaskView({
       overflowX: 'hidden',
       overflowY: 'auto'
     }}>
-      {/* 顶部操作条与指标 */}
+      {/* 顶部操作条与统计 */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -448,12 +457,26 @@ export function TaskView({
             borderRadius: '4px',
             whiteSpace: 'nowrap'
           }}>
-            {data.type === 'standard_5cols' ? '五列流转看板' : '自定义看板'}
+            人机协同看板
           </span>
           <span style={{ fontSize: '13px', fontWeight: 600 }}>{data.meta?.title || workspaceTitle}</span>
           <span style={{ fontSize: '11.5px', color: 'var(--dsw-alias-label-tertiary, #686872)' }}>
             ({cwd})
           </span>
+          {waitingHumanCount > 0 && (
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 700,
+              color: '#f97316',
+              background: 'rgba(249, 115, 22, 0.15)',
+              border: '1px solid rgba(249, 115, 22, 0.3)',
+              padding: '1px 6px',
+              borderRadius: '4px',
+              animation: 'pulse 1.5s infinite'
+            }}>
+              🚨 {waitingHumanCount} 个任务等待人工干预
+            </span>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
@@ -481,7 +504,7 @@ export function TaskView({
         </div>
       </div>
 
-      {/* 限时专注计时器横幅 */}
+      {/* 人类专注计时条 (仅当有人类计时进行中或空闲时呈现) */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -498,10 +521,10 @@ export function TaskView({
           <span style={{ fontSize: '16px' }}>⏱</span>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--dsw-alias-label-secondary, #a0a0a8)' }}>
-              {activeTimerTask ? `限时专注进行中` : '点击任意任务卡片上的 [⏱] 图标载入专注倒计时'}
+              {activeTimerTask ? `人类专注进行中` : '人类任务点击 [⏱] 载入限时计时；AI 任务点击 [🚀 派发会话] 直接开会话执行'}
             </div>
             <div style={{ fontSize: '13px', fontWeight: 600, color: activeTimerTask ? '#60a5fa' : '#f0f0f2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {activeTimerTask ? activeTimerTask.title : '计时结束后将自动标记任务流转至【完成】'}
+              {activeTimerTask ? activeTimerTask.title : '人机双轨协作中枢'}
             </div>
           </div>
         </div>
@@ -558,7 +581,7 @@ export function TaskView({
         </div>
       </div>
 
-      {/* 核心看板泳道（自适应列数：标准五列或自定义列） */}
+      {/* 核心看板泳道 */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${data.columns.length}, minmax(190px, 1fr))`,
@@ -626,6 +649,7 @@ export function TaskView({
                       setEditingTask(null)
                       setFormTitle('')
                       setFormDesc('')
+                      setFormAssignee('human')
                       setFormTags('')
                     }}
                     title="向此列添加任务"
@@ -650,13 +674,15 @@ export function TaskView({
                   const isTimerTarget = activeTimerTask?.id === task.id
                   const isDone = task.columnId === 'done'
                   const isFailed = task.columnId === 'failed'
+                  const isAi = task.assignee === 'ai'
+                  const isWaitingHuman = Boolean(task.waitingHumanAction)
 
                   return (
                     <div
                       key={task.id}
                       style={{
                         background: 'var(--dsw-alias-bg-base, #151517)',
-                        border: `1px solid ${isTimerTarget ? '#4d6bfe' : isFailed ? 'rgba(239, 68, 68, 0.4)' : isDone ? 'rgba(16, 185, 129, 0.25)' : 'var(--dsw-alias-border-l2, rgba(255,255,255,0.1))'}`,
+                        border: `1px solid ${isWaitingHuman ? '#f97316' : isTimerTarget ? '#4d6bfe' : isFailed ? 'rgba(239, 68, 68, 0.4)' : isDone ? 'rgba(16, 185, 129, 0.25)' : 'var(--dsw-alias-border-l2, rgba(255,255,255,0.1))'}`,
                         borderRadius: '6px',
                         padding: '9px 10px',
                         display: 'flex',
@@ -666,17 +692,33 @@ export function TaskView({
                         transition: 'border-color 150ms ease'
                       }}
                     >
+                      {/* 卡片顶行：责任标签 + 标题 + 优先级 */}
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-                        <span style={{
-                          fontSize: '12.5px',
-                          fontWeight: 500,
-                          lineHeight: 1.4,
-                          color: isDone ? '#888' : isFailed ? '#fca5a5' : '#eee',
-                          textDecoration: isDone ? 'line-through' : 'none',
-                          wordBreak: 'break-word'
-                        }}>
-                          {task.title}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', flex: 1, minWidth: 0 }}>
+                          {/* 人机标识徽章 */}
+                          <span style={{
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            padding: '1px 4px',
+                            borderRadius: '3px',
+                            flexShrink: 0,
+                            color: isAi ? '#a78bfa' : '#38bdf8',
+                            background: isAi ? 'rgba(167, 139, 250, 0.12)' : 'rgba(56, 189, 248, 0.12)'
+                          }}>
+                            {isAi ? '🤖 AI' : '👤 人类'}
+                          </span>
+
+                          <span style={{
+                            fontSize: '12.5px',
+                            fontWeight: 500,
+                            lineHeight: 1.4,
+                            color: isDone ? '#888' : isFailed ? '#fca5a5' : '#eee',
+                            textDecoration: isDone ? 'line-through' : 'none',
+                            wordBreak: 'break-word'
+                          }}>
+                            {task.title}
+                          </span>
+                        </div>
 
                         <span style={{
                           fontSize: '10px',
@@ -697,9 +739,67 @@ export function TaskView({
                         </div>
                       )}
 
+                      {/* AI 遇到人机验证阻断的警示横幅 */}
+                      {isWaitingHuman && (
+                        <div style={{
+                          fontSize: '11px',
+                          color: '#fed7aa',
+                          background: 'rgba(249, 115, 22, 0.15)',
+                          border: '1px solid rgba(249, 115, 22, 0.3)',
+                          padding: '5px 7px',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px'
+                        }}>
+                          <div>🚨 <b>AI 等待人工处理：</b>{task.waitingHumanAction}</div>
+                          <button
+                            onClick={() => handleResolveHumanBlock(task)}
+                            style={{
+                              alignSelf: 'flex-end',
+                              background: '#f97316',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '2px 8px',
+                              borderRadius: '3px',
+                              fontSize: '10.5px',
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ✔ 我已处理，通知 AI 继续
+                          </button>
+                        </div>
+                      )}
+
                       {task.reason && (
                         <div style={{ fontSize: '11px', color: '#f87171', background: 'rgba(239, 68, 68, 0.08)', padding: '3px 6px', borderRadius: '4px' }}>
-                          ⚠ 失败原因: {task.reason}
+                          ⚠ 阻塞原因: {task.reason}
+                        </div>
+                      )}
+
+                      {/* 绑定的 AI 执行会话入口 */}
+                      {task.claimedSessionId && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
+                          <span style={{ color: 'var(--dsw-alias-label-tertiary)' }}>执行会话:</span>
+                          <button
+                            onClick={() => onOpenSession?.(task.claimedSessionId!)}
+                            style={{
+                              background: 'rgba(167, 139, 250, 0.1)',
+                              border: '1px solid rgba(167, 139, 250, 0.25)',
+                              color: '#c4b5fd',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              fontSize: '10.5px',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px'
+                            }}
+                          >
+                            <span>💬 {task.claimedSessionId.slice(0, 10)}...</span>
+                            <span>↗</span>
+                          </button>
                         </div>
                       )}
 
@@ -720,7 +820,7 @@ export function TaskView({
                         </div>
                       )}
 
-                      {/* 卡片底栏与流转操作 */}
+                      {/* 卡片底栏：人机动作区分 */}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -731,24 +831,39 @@ export function TaskView({
                         borderTop: '1px solid var(--dsw-alias-border-l1, rgba(255,255,255,0.06))',
                         marginTop: '2px'
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <button
-                            onClick={() => handleStartTimer(task)}
-                            title="限时专注计时"
-                            style={{ background: 'transparent', border: 'none', color: isTimerTarget ? '#eab308' : '#38bdf8', cursor: 'pointer', fontSize: '11px' }}
-                          >
-                            ⏱ {task.targetMinutes || 25}m
-                          </button>
-                          <button
-                            onClick={() => handleDispatchAiPrompt(task)}
-                            title="向 AI 发送复盘诊断"
-                            style={{ background: 'transparent', border: 'none', color: '#a78bfa', cursor: 'pointer', fontSize: '11px' }}
-                          >
-                            ✨ 复盘
-                          </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {isAi ? (
+                            <button
+                              onClick={() => handleTriggerDispatchAi(task)}
+                              disabled={dispatchingId === task.id}
+                              style={{
+                                background: 'rgba(167, 139, 250, 0.15)',
+                                border: '1px solid rgba(167, 139, 250, 0.3)',
+                                color: '#c4b5fd',
+                                padding: '2px 6px',
+                                borderRadius: '3px',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                              }}
+                            >
+                              <span>{dispatchingId === task.id ? '启动中...' : '🚀 派发会话'}</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleStartTimer(task)}
+                              title="限时专注计时"
+                              style={{ background: 'transparent', border: 'none', color: isTimerTarget ? '#eab308' : '#38bdf8', cursor: 'pointer', fontSize: '11px' }}
+                            >
+                              ⏱ {task.targetMinutes || 25}m
+                            </button>
+                          )}
                         </div>
 
-                        {/* 流转下拉/快捷菜单 */}
+                        {/* 流转选择与删除 */}
                         <div style={{ display: 'flex', gap: '4px' }}>
                           <select
                             value={task.columnId}
@@ -823,9 +938,34 @@ export function TaskView({
               type="text"
               value={formDesc}
               onChange={e => setFormDesc(e.target.value)}
-              placeholder="要点或说明 (选填)..."
+              placeholder="任务执行目标与详细说明 (选填)..."
               style={{ background: '#151517', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', padding: '6px 8px', color: '#fff', fontSize: '12px', outline: 'none' }}
             />
+
+            {/* 责任人选择：人类 vs AI */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px' }}>
+              <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>责任人:</span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="assignee"
+                  value="human"
+                  checked={formAssignee === 'human'}
+                  onChange={() => setFormAssignee('human')}
+                />
+                <span>👤 人类执行 (计时打勾)</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="assignee"
+                  value="ai"
+                  checked={formAssignee === 'ai'}
+                  onChange={() => setFormAssignee('ai')}
+                />
+                <span>🤖 AI 派发执行</span>
+              </label>
+            </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
               <select
@@ -842,8 +982,8 @@ export function TaskView({
                 type="number"
                 value={formMinutes}
                 onChange={e => setFormMinutes(Math.max(1, Number(e.target.value) || 25))}
-                placeholder="预计限时 (分)"
-                style={{ width: '100px', background: '#151517', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', padding: '5px', color: '#fff', fontSize: '12px' }}
+                placeholder="预估耗时 (分)"
+                style={{ width: '90px', background: '#151517', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', padding: '5px', color: '#fff', fontSize: '12px' }}
               />
 
               <input

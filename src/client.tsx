@@ -1,12 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
-import { TaskView, type CanvasBoardData } from './TaskView'
+import { TaskView, type KanbanTaskItem } from './TaskView'
 
-export const inject = ['slots', 'sessions', 'workspaces']
+export const inject = ['slots', 'sessions', 'workspaces', 'uiWorkspace']
 
 const VIEW_ID_TASK = 'dsh-task-canvas'
-const VIEW_ID_DESIGN = 'ipollowork-design-studio'
-const VIEW_ID_VIDEO = 'ipollowork-video-studio'
 
 export function apply(ctx: Context) {
   // 1. 向 DSH 原生 conversation.view 插槽注入 Task 视图
@@ -18,7 +16,7 @@ export function apply(ctx: Context) {
         order: 15,
         label: 'Task'
       },
-      CanvasViewBridge
+      (props) => <CanvasViewBridge {...props} cordisCtx={ctx} />
     )
   )
 
@@ -29,7 +27,7 @@ export function apply(ctx: Context) {
 /**
  * 桥接组件：负责获取当前会话所在的 Workspace，读取状态并渲染 TaskView
  */
-function CanvasViewBridge({ sessionId, useWorkspaces, inputActions }: { sessionId: string; useWorkspaces: any; inputActions?: any }) {
+function CanvasViewBridge({ sessionId, useWorkspaces, inputActions, cordisCtx }: { sessionId: string; useWorkspaces: any; inputActions?: any; cordisCtx: Context }) {
   const workspace = useWorkspaces((state: any) =>
     state.items?.find((item: any) => item.sessionIds?.includes(sessionId))
   )
@@ -69,6 +67,31 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions }: { sessionI
     loadStatus()
   }, [workspaceId, cwd])
 
+  // 监听会话轮次结束事件：当会话完成一轮（由 busy 变 idle）时自动无感静默刷新看板
+  useEffect(() => {
+    if (!cordisCtx.sessions?.list) return
+    let lastPhase = cordisCtx.sessions.list.getSnapshot().phase
+    const unsubscribe = cordisCtx.sessions.list.subscribe(() => {
+      const snap = cordisCtx.sessions.list.getSnapshot()
+      // 如果发生会话更新，静默重读一次 tasks.json
+      if (workspaceId && cwd) {
+        fetch('/api/workspace-canvas/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workspaceId, cwd })
+        })
+          .then(res => res.json())
+          .then(res => {
+            if (res.ok && res.status.tasksData) {
+              setTasksData(res.status.tasksData)
+            }
+          })
+          .catch(() => {})
+      }
+    })
+    return () => unsubscribe()
+  }, [cordisCtx, workspaceId, cwd])
+
   // 保存数据回工作区 tasks.json
   const handleSave = async (updatedData: any) => {
     setTasksData(updatedData)
@@ -79,7 +102,7 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions }: { sessionI
     })
   }
 
-  // 桥接向 AI 发送复盘指令并切回对话
+  // 桥接向当前会话发送指令
   const handleSendToAi = (prompt: string) => {
     if (inputActions && typeof inputActions.setDraft === 'function') {
       inputActions.setDraft(prompt)
@@ -88,6 +111,68 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions }: { sessionI
     } else {
       navigator.clipboard?.writeText(prompt)
       alert('✨ 复盘诊断提问已自动复制到剪贴板！可直接粘贴到底部输入框发送给 AI。')
+    }
+  }
+
+  // 一键派发独立会话执行 AI 任务
+  const handleDispatchAiSession = async (task: KanbanTaskItem): Promise<string | void> => {
+    try {
+      let newSessionId: string | undefined
+
+      // 1. 调用 DSH 原生接口创建属于当前工作区的全新会话
+      if (cordisCtx.sessions?.create) {
+        newSessionId = await cordisCtx.sessions.create({ workspaceId })
+      } else if (cordisCtx.uiWorkspace?.connectWorkspace) {
+        newSessionId = await cordisCtx.uiWorkspace.connectWorkspace(workspaceId)
+      }
+
+      if (!newSessionId) {
+        throw new Error('无法创建新会话，DSH 会话服务未就绪')
+      }
+
+      // 2. 构造该任务的初始目标 Prompt 并写入会话
+      const dispatchPrompt = [
+        `【派发独立任务执行】`,
+        `任务名称：${task.title}`,
+        task.desc ? `目标说明：${task.desc}` : '',
+        task.targetMinutes ? `建议限时：${task.targetMinutes} 分钟` : '',
+        `工作区路径：${cwd}`,
+        `----------------------------------------`,
+        `请阅读当前工作区相关文件，推进并完成上述任务。`,
+        `执行准则：`,
+        `1. 若执行完成，请使用工具更新根目录 ./tasks.json 将本任务 [ID: ${task.id}] 移入 "done" 列；`,
+        `2. 若中途遇到需要人类干预的硬性阻断（如验证码/扫码/密码/人工决策），请勿报错退出，请在 ./tasks.json 中将本任务标记 waitingHumanAction 简述原因，等待人类在看板确认；`,
+        `3. 若遇到无法解决的严重异常，请将本任务移入 "failed" 列并填写 reason 根因。`
+      ].filter(Boolean).join('\n')
+
+      // 3. 打开该会话并将初始任务填入
+      if (cordisCtx.sessions?.open) {
+        cordisCtx.sessions.open(newSessionId)
+      }
+
+      // 延迟微秒写入 draft
+      setTimeout(() => {
+        if (inputActions && typeof inputActions.setDraft === 'function') {
+          inputActions.setDraft(dispatchPrompt)
+        }
+        // 切回 Chat 标签以供查看执行
+        const chatTab = document.querySelector('button[role="tab"]') as HTMLButtonElement
+        if (chatTab) chatTab.click()
+      }, 200)
+
+      return newSessionId
+    } catch (err: any) {
+      console.error('[dsh-workspace-canvas] dispatch failed:', err)
+      throw err
+    }
+  }
+
+  // 点击卡片直接打开关联的会话
+  const handleOpenSession = (targetSessionId: string) => {
+    if (cordisCtx.sessions?.open) {
+      cordisCtx.sessions.open(targetSessionId)
+      const chatTab = document.querySelector('button[role="tab"]') as HTMLButtonElement
+      if (chatTab) chatTab.click()
     }
   }
 
@@ -142,6 +227,8 @@ function CanvasViewBridge({ sessionId, useWorkspaces, inputActions }: { sessionI
       onSave={handleSave}
       onSendToAi={handleSendToAi}
       onReloadStatus={loadStatus}
+      onDispatchAiSession={handleDispatchAiSession}
+      onOpenSession={handleOpenSession}
     />
   )
 }
@@ -159,9 +246,7 @@ function getCurrentWorkspaceScope(ctx?: Context): string {
         if (found?.workspaceId) return String(found.workspaceId)
       }
     }
-  } catch (e) {
-    // 降级使用 default
-  }
+  } catch (e) {}
   return 'default'
 }
 
@@ -281,15 +366,12 @@ function setupDynamicViewManager(ctx: Context) {
   `
   document.head.appendChild(styleEl)
 
-  // 同步 Tab 栏标识与当前工作区专属的显隐属性
   const syncTabBar = () => {
     const tablist = document.querySelector('[role="tablist"]')
     if (!tablist) return
 
-    // 获取当前活动工作区的独立 scope key
     const wsScope = getCurrentWorkspaceScope(ctx)
 
-    // 标记各 tab 的类型
     const tabs = tablist.querySelectorAll('button[role="tab"]')
     tabs.forEach(tab => {
       const text = tab.textContent?.trim()
@@ -302,7 +384,6 @@ function setupDynamicViewManager(ctx: Context) {
       }
     })
 
-    // 基于当前工作区读取独立配置
     const showTask = localStorage.getItem(`dsh.canvas.${wsScope}.show_task`) === 'true'
     const showDesign = localStorage.getItem(`dsh.canvas.${wsScope}.show_design`) === 'true'
     const showVideo = localStorage.getItem(`dsh.canvas.${wsScope}.show_video`) === 'true'
@@ -311,7 +392,6 @@ function setupDynamicViewManager(ctx: Context) {
     document.body.setAttribute('data-dsh-show-design', showDesign ? 'true' : 'false')
     document.body.setAttribute('data-dsh-show-video', showVideo ? 'true' : 'false')
 
-    // 注入 [+] 按钮（若尚未注入）
     if (!tablist.querySelector('.dsh-view-add-btn')) {
       const addBtn = document.createElement('button')
       addBtn.className = 'dsh-view-add-btn'
@@ -359,7 +439,6 @@ function setupDynamicViewManager(ctx: Context) {
 
         menuEl.onclick = (ev) => ev.stopPropagation()
 
-        // 绑定工作区独立切换
         const bindToggle = (id: string, prop: string, bodyAttr: string, kind: string, currentVal: boolean) => {
           const item = menuEl?.querySelector(id) as HTMLElement | null
           if (item) {
